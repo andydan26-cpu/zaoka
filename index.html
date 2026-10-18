@@ -1073,6 +1073,14 @@ function showBetween(res,dayOver){
   $('bNext').onclick=()=>showPrep();
 }
 
+let FIRE_ASK=null;
+const severance=s=>salary(s)*21; // 資遣費：一週薪水
+// 營業本金：開一場店至少要留著的錢（本場薪水＋水電＋週轉金）
+function opFloor(){const sal=G.staff.filter(s=>s.role!=='rest').reduce((a,s)=>a+salary(s),0);
+  return sal+G.stoves.reduce((a,k)=>a+40+20*G.stoveLv[k],0)}
+function opCap(){return opFloor()+5000}
+// 非營業必要的花費（還債、投資、聘人）不能動到營業本金
+const capOk=c=>{if(G.cash-c<opCap()){toast('花了會低於營業本金 '+fmt(opCap())+'，店就開不了');return false}return true};
 function showPrep(){
   paused=true;selected=null;
   const day=G.meal===0;
@@ -1084,7 +1092,9 @@ function showPrep(){
     <div class="small">心情 ${Math.round(s.mood)}｜體力 ${Math.round(s.stam)}｜薪水 ${salary(s)}/餐期</div>
     <div class="small">${tops.map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div>
     ${s.mood<20?`<div class="neg small">想離職了！<button class="btn sm" data-bonus="${s.id}">發獎金 3,000</button> <button class="btn sm ghost" data-talk="${s.id}">談心</button></div>`:''}
-    <div class="row" style="margin-top:4px"><span class="small">下一場</span>${sel(s)}</div></div>`};
+    <div class="row" style="margin-top:4px"><span class="small">下一場</span>${sel(s)}</div>
+    ${FIRE_ASK===s.id?`<div class="row" style="margin-top:6px;background:#c2412d18;border-radius:6px;padding:4px 6px"><span class="small neg">資遣費 ${fmt(severance(s))}，其他人心情會變差</span><span><button class="btn sm" data-fireok="${s.id}">確定開除</button> <button class="btn sm ghost" data-firecancel="1">算了</button></span></div>`
+      :`<div style="text-align:right;margin-top:4px"><button class="btn sm ghost" data-fire="${s.id}" style="color:var(--bad)">開除</button></div>`}</div>`};
   const bossBox=()=>`<div class="box"><div class="row"><b>老闆（你）</b><span class="small">自己走位</span></div><div class="small">親自做哪個崗位，哪項能力就成長</div><div class="small">${Object.entries(G.boss.abil).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div></div>`;
   const priceRow=d=>{const r=G.prices[d.id]/d.ref;const em=r<=.9?'😀':r<=1.1?'🙂':r<=1.3?'😐':'😟';
     const on=G.menu.includes(d.id), ok=dishOk(d), miss=d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]);
@@ -1112,20 +1122,34 @@ function showPrep(){
       <p class="small">4 桌店面最多 6 位員工。</p>
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
-      <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*.005)}</span></div>`;
+      <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><button class="btn sm ghost" data-pay="max">能還的全還</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*.005)}</span></div>
+      <p class="small">營業本金 ${fmt(opCap())}（本場薪水＋水電＋週轉金 5,000）：還債、升級、擴店、聘人都不能動到這筆錢。</p>`;
   }
-  h+=`<div class="foot">${day?'<button class="btn ghost" id="bClose">今天店休</button>':''}<button class="btn" id="bGo">開始${MEALS[G.meal]}營業</button></div>`;
+  const cap=opFloor(), short=G.cash<cap;
+  if(short)h+=`<div class="box neg" style="margin-top:12px;font-weight:700">現金 ${fmt(G.cash)} 付不起這場的薪水和水電 ${fmt(cap)}，不能營業。可以排人休息或開除員工降低薪水。</div>`;
+  h+=`<div class="foot">${day?'<button class="btn ghost" id="bClose">今天店休</button>':''}<button class="btn" id="bGo" ${short?'disabled':''}>開始${MEALS[G.meal]}營業</button></div>`;
   showOverlay(h,'prep');
   const P=$('panel');
-  P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value});
-  P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ING[k]*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
+  P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
+  P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ING[k]*n*(n>=30?.9:1));if(G.cash-c<opFloor())return toast('進貨後會付不起薪水水電');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
-  P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(G.cash<cost)return toast('現金不夠');G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
-  P.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>{if(G.cash<EXPAND_COST)return toast('現金不夠');G.cash-=EXPAND_COST;G.slots++;toast('打通隔壁了！多一個爐具空位');showPrep()});
-  P.querySelectorAll('[data-buystove]').forEach(b=>b.onclick=()=>{const k=b.dataset.buystove;if(G.cash<NEW_STOVE_COST)return toast('現金不夠');if(G.stoves.length>=G.slots)return;G.cash-=NEW_STOVE_COST;G.stoves.push(k);toast(STOVE_FULL[k]+' 裝好了');showPrep()});
-  P.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const k=b.dataset.up,c=STOVE_COST[G.stoveLv[k]-1];if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stoveLv[k]++;showPrep()});
-  P.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const v=Math.min(+b.dataset.pay,G.debt);if(G.cash<v)return toast('現金不夠');G.cash-=v;G.debt-=v;showPrep()});
+  P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(!capOk(cost+salary(c)))return;G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
+  P.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>{if(!capOk(EXPAND_COST))return;G.cash-=EXPAND_COST;G.slots++;toast('打通隔壁了！多一個爐具空位');showPrep()});
+  P.querySelectorAll('[data-buystove]').forEach(b=>b.onclick=()=>{const k=b.dataset.buystove;if(!capOk(NEW_STOVE_COST))return;if(G.stoves.length>=G.slots)return;G.cash-=NEW_STOVE_COST;G.stoves.push(k);toast(STOVE_FULL[k]+' 裝好了');showPrep()});
+  P.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const k=b.dataset.up,c=STOVE_COST[G.stoveLv[k]-1];if(!capOk(c))return;G.cash-=c;G.stoveLv[k]++;showPrep()});
+  P.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const room=Math.max(0,G.cash-opCap());
+    const v=b.dataset.pay==='max'?Math.min(room,G.debt):Math.min(+b.dataset.pay,G.debt);
+    if(v<=0)return toast(G.debt<=0?'債已經還清了':'現金只剩營業本金，不能再還');
+    if(v>room)return toast('還了會低於營業本金 '+fmt(opCap())+'，店就開不了');
+    G.cash-=v;G.debt-=v;toast('還了 '+fmt(v));showPrep()});
+  P.querySelectorAll('[data-fire]').forEach(b=>b.onclick=()=>{FIRE_ASK=(G.staff.find(x=>x.id==b.dataset.fire)||{}).id;showPrep()});
+  P.querySelectorAll('[data-firecancel]').forEach(b=>b.onclick=()=>{FIRE_ASK=null;showPrep()});
+  P.querySelectorAll('[data-fireok]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.fireok);FIRE_ASK=null;if(!s)return showPrep();
+    const c=severance(s);if(G.cash<c){toast('現金不夠付資遣費 '+fmt(c));return showPrep()}
+    G.cash-=c;G.staff=G.staff.filter(x=>x!==s);
+    G.staff.forEach(o=>{o.mood=Math.max(1,o.mood-(o.traits.includes('玻璃心')?12:o.traits.includes('樂天')?3:6))});
+    toast(s.name+' 離開了，付了資遣費 '+fmt(c),3);save();showPrep()});
   P.querySelectorAll('[data-bonus]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.bonus);if(G.cash<3000)return toast('現金不夠');G.cash-=3000;s.mood+=s.traits.includes('愛錢')?50:25;showPrep()});
   P.querySelectorAll('[data-talk]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.talk);if(Math.random()<.5){s.mood+=25;toast(s.name+'：好啦，我再做做看')}else{s.mood=Math.max(1,s.mood-5);toast(s.name+'：你根本不懂')}showPrep()});
   $('bGo').onclick=()=>{R=null;startMeal()};
