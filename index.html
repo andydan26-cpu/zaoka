@@ -234,7 +234,7 @@ function newGame(){
      bench:{'肉':3,'海鮮':2,'蔬菜':3,'米麵':10,'蛋奶':3,'調味':5},
      stock:{'肉':20,'海鮮':12,'蔬菜':20,'米麵':30,'蛋奶':20,'調味':30},
      prices:Object.fromEntries(DISHES.map(d=>[d.id,d.ref])),
-     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false,
+     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false, rel:{'1-2':50},
      boss:{name:'老闆',abil:abil({prep:35,order:30,serve:30,bus:30,cash:30,deliv:20,steam:25,boil:25,fry:25,wok:25,clean:30,buy:30})},
      staff:[
       {id:1,name:'阿福師',title:'老師傅',traits:['勤勞','慢慢來'],mood:70,stam:90,role:'wok',
@@ -272,6 +272,7 @@ function startMeal(){
   let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
   if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
   delete SPOTS.roach;
+  comboSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
   const base=[10,16,14][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
   for(let i=0;i<n;i++){const u=Math.random();
@@ -390,7 +391,7 @@ function addReview(s,w,txt){for(let i=0;i<w;i++)G.reviews.push(s);R.newReviews.p
 function fx(x,y,txt,col){R.fx.push({x,y,txt,col,t:1.4})}
 
 function workerFactor(p,key,isBoss){
-  const a=p.abil[key]; let f=.45+a/100;
+  const a=p.abil[key]; let f=(.45+a/100)*((R&&R.cmul&&R.cmul[key])||1);
   if(!isBoss){
     f*= p.stam<20?.6:p.stam<50?.85:1;
     f*= p.mood>=80?(p.traits.includes('玻璃心')?1.3:1.15):p.mood<40?.85:1;
@@ -416,7 +417,7 @@ function headTicket(st){return R.tickets.find(t=>t.st==='queued'&&t.steps[t.si]=
 function update(dt){
   R.t+=TUT?0:dt;
   if(R.battle)battleTick(dt);
-  mealEvTick(dt); tutTick();
+  mealEvTick(dt); tutTick(); comboTick(dt);
   const PWR=(R.battle&&R.battle.deb.power>0)||R.ev.power>0, WTR=(R.battle&&R.battle.deb.water>0)||R.ev.water>0;
   while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();if(R.closed)R.skipped=(R.skipped||0)+1;else spawnGroup()}
   // 老闆
@@ -548,6 +549,8 @@ function carrierAI(s,dt){
   return false;
 }
 function tryFinish(t){
+  if(R.combo&&R.combo.wokServe&&t.steps[t.steps.length-1]==='wok'&&G.plates>0&&t.c&&['wait','order'].includes(t.c.st)&&!TUT){
+    G.plates--;t.stall=null;const tb=R.tables[t.c.table];fx(tb.x,tb.y-60,'✨ 出菜即送','#c2412d');deliver(t);return}
   if(G.plates<=0){t.stall='缺盤';return}
   if(R.pass.length>=4){t.stall='出餐台滿';return}
   t.stall=null;G.plates--;t.st='ready';R.pass.push(t);
@@ -731,11 +734,12 @@ function endMeal(){
     if(s.stam<=0)notes.push(s.name+' 累倒了');
     s.mood=clamp(s.mood,0,100);
   }
+  relAfterMeal(notes);
   G.staff.forEach(s=>{if(s.backRole){s.role=s.backRole;delete s.backRole}});
   const res={rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
-  G.staff=G.staff.filter(s=>{if(s.mood<=0){notes.push(s.name+' 心情跌到谷底，離職了');return false}return true});
+  const quit=G.staff.filter(s=>s.mood<=0);G.staff=G.staff.filter(s=>s.mood>0);quit.forEach(s=>{notes.push(s.name+' 心情跌到谷底，離職了');friendsLeave(s,notes)});
   const wasMeal=G.meal;
   G.meal++;
   if(G.meal>2){G.meal=0;dayEnd(res,notes)} else {res.title=MEALS[wasMeal]+'結束';showBetween(res,false)}
@@ -1095,7 +1099,7 @@ function showTitle(){
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
   $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
-  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
+  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.rel)G.rel={'1-2':50};if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
 
@@ -1133,11 +1137,20 @@ function showPrep(){
     <div class="small">${s.traits.map(t=>`<span class="tag" title="${TRAITS[t]}">${t}</span>`).join('')}</div>
     <div class="small">心情 ${Math.round(s.mood)}｜體力 ${Math.round(s.stam)}｜薪水 ${salary(s)}/餐期</div>
     <div class="small">${tops.map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div>
+    ${(()=>{const r=G.staff.filter(o=>o!==s).map(o=>[o,relOf(s,o)]).filter(([o,v])=>Math.abs(v)>=30);return r.length?`<div class="small">${r.map(([o,v])=>`${relTag(v).split(' ')[0]} ${o.name}`).join('　')}</div>`:''})()}
     ${s.mood<20?`<div class="neg small">想離職了！<button class="btn sm" data-bonus="${s.id}">發獎金 3,000</button> <button class="btn sm ghost" data-talk="${s.id}">談心</button></div>`:''}
     <div class="row" style="margin-top:4px"><span class="small">下一場</span>${sel(s)}</div>
     ${FIRE_ASK===s.id?`<div class="row" style="margin-top:6px;background:#c2412d18;border-radius:6px;padding:4px 6px"><span class="small neg">資遣費 ${fmt(severance(s))}，其他人心情會變差</span><span><button class="btn sm" data-fireok="${s.id}">確定開除</button> <button class="btn sm ghost" data-firecancel="1">算了</button></span></div>`
       :`<div style="text-align:right;margin-top:4px"><button class="btn sm ghost" data-fire="${s.id}" style="color:var(--bad)">開除</button></div>`}</div>`};
   const bossBox=()=>`<div class="box"><div class="row"><b>老闆（你）</b><span class="small">自己走位</span></div><div class="small">親自做哪個崗位，哪項能力就成長</div><div class="small">${Object.entries(G.boss.abil).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div></div>`;
+  const comboHtml=()=>{const cs=findCombos(),fr=[];G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>{if(relOf(a,b)>=60)fr.push(a.name+'＋'+b.name)}));
+    let h=`<h2>員工關係・連攜技</h2><p class="small">常排同一場會越來越熟；個性相剋（勤勞 vs 愛偷懶、天生快手 vs 慢慢來）會越處越差。好朋友（💛）排在同一場、崗位搭得上，就會發動連攜技。</p>`;
+    h+=cs.length?`<div class="grid">${cs.map(c=>`<div class="box" style="border:2px solid var(--gold)"><b>✨ ${c.n}</b><br><span class="small">${c.who}｜${c.d}</span></div>`).join('')}</div>`
+      :`<div class="box small">這一場的排班沒有發動連攜技。${fr.length?'好朋友：'+fr.join('、')+'，試試把他們排成搭配的崗位。':'目前還沒有好朋友。'}</div>`;
+    h+=`<details style="margin-top:6px"><summary class="small">全部連攜技組合</summary><div class="small">${COMBOS.map(c=>`<b>${c.n}</b>：${c.d}`).join('<br>')}<br>（崗位搭配：炒＋外場、外場＋清潔、清潔＋任一內場、煮＋炒、蒸＋炸、外場＋外場、搬食材＋任一內場、同崗位兩人）</div></details>`;
+    if(day&&G.staff.length){const cost=300*(G.staff.length+1),done=G.dinnerDay===G.day;
+      h+=`<div class="box row" style="margin-top:8px"><span><b>員工會餐</b><br><span class="small">大家心情 +15、彼此感情 +15。一天一次</span></span><button class="btn sm" data-dinner="1" ${done?'disabled':''}>${done?'今天吃過了':'請客 '+fmt(cost)}</button></div>`}
+    return h};
   const priceRow=d=>{const r=G.prices[d.id]/d.ref;const em=r<=.9?'😀':r<=1.1?'🙂':r<=1.3?'😐':'😟';
     const on=G.menu.includes(d.id), ok=dishOk(d), miss=d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]);
     return `<div class="box" style="${on?'':'opacity:.55'}"><div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="m_${d.id}" data-menu="${d.id}"${on?' checked':''}${ok?'':' disabled'}>${d.name}</label><span>${em}</span></div>
@@ -1154,7 +1167,7 @@ function showPrep(){
   const intro=!G.prepIntro?`<div class="box" style="display:flex;gap:10px;align-items:center;border:2px solid var(--red);margin:8px 0"><img alt="" src="${ART_SRC.chef}" style="width:48px"><span><b style="color:var(--red)">阿福師</b><br>每一場開店前都會來這裡：排誰做哪個崗位、去進貨、決定今天賣哪幾道菜跟價錢。食材箱的貨不夠，營業中就沒得做。弄好了按最下面「開始營業」。</span></div>`:'';
   let h=`<h1>第 ${G.day} 天・${MEALS[G.meal]} 準備</h1>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
-   ${intro}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>
+   ${intro}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
    <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.map(priceRow).join('')}</div>`;
   if(day){
@@ -1172,6 +1185,8 @@ function showPrep(){
   showOverlay(h,'prep');
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
+  P.querySelectorAll('[data-dinner]').forEach(b=>b.onclick=()=>{const cost=300*(G.staff.length+1);if(G.cash<cost)return toast('現金不夠');G.cash-=cost;G.dinnerDay=G.day;
+    G.staff.forEach(s=>s.mood=Math.min(100,s.mood+15));G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>relAdd(a,b,15)));toast('大家吃得很開心！');showPrep()});
   P.querySelectorAll('[data-plate]').forEach(b=>b.onclick=()=>{const n=+b.dataset.plate,c=n*80;if(G.cash<c)return toast('現金不夠');G.cash-=c;G.plates+=n;G.platesLost=Math.max(0,(G.platesLost||0)-n);showPrep()});
   P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
@@ -1190,7 +1205,7 @@ function showPrep(){
   P.querySelectorAll('[data-fireok]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.fireok);FIRE_ASK=null;if(!s)return showPrep();
     const c=severance(s);if(G.cash<c){toast('現金不夠付資遣費 '+fmt(c));return showPrep()}
     G.cash-=c;G.staff=G.staff.filter(x=>x!==s);
-    G.staff.forEach(o=>{o.mood=Math.max(1,o.mood-(o.traits.includes('玻璃心')?12:o.traits.includes('樂天')?3:6))});
+    G.staff.forEach(o=>{o.mood=Math.max(1,o.mood-(o.traits.includes('玻璃心')?12:o.traits.includes('樂天')?3:6))});friendsLeave(s);
     toast(s.name+' 離開了，付了資遣費 '+fmt(c),3);save();showPrep()});
   P.querySelectorAll('[data-bonus]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.bonus);if(G.cash<3000)return toast('現金不夠');G.cash-=3000;s.mood+=s.traits.includes('愛錢')?50:25;showPrep()});
   P.querySelectorAll('[data-talk]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.talk);if(Math.random()<.5){s.mood+=25;toast(s.name+'：好啦，我再做做看')}else{s.mood=Math.max(1,s.mood-5);toast(s.name+'：你根本不懂')}showPrep()});
@@ -1202,6 +1217,67 @@ function showPrep(){
 }
 
 
+
+
+/* ---------- 員工關係與連攜技 ---------- */
+const rk=(a,b)=>a.id<b.id?a.id+'-'+b.id:b.id+'-'+a.id;
+const relOf=(a,b)=>((G.rel||{})[rk(a,b)])||0;
+function relAdd(a,b,v){G.rel=G.rel||{};const k=rk(a,b);G.rel[k]=clamp((G.rel[k]||0)+v,-100,100)}
+const relTag=v=>v>=60?'💛 好朋友':v>=30?'😊 合得來':v<=-30?'⚡ 不合':'普通';
+const CLASH=[['勤勞','愛偷懶'],['天生快手','慢慢來']];
+const clash=(a,b)=>CLASH.some(([x,y])=>a.traits.includes(x)&&b.traits.includes(y)||a.traits.includes(y)&&b.traits.includes(x));
+const KITCH_ROLES=['boil','wok','steam','fry','prep'];
+// 連攜技：好朋友＋同一場上班＋崗位搭配
+const COMBOS=[
+ {id:'wokServe',n:'出菜即送',d:'炒好的菜直接送到客人桌上',m:(a,b)=>a==='wok'&&b==='floor'},
+ {id:'busSink',n:'碗盤直送水槽',d:'客人走後髒盤子自動送進水槽',m:(a,b)=>a==='floor'&&b==='clean'},
+ {id:'plateHand',n:'乾淨盤子遞到手',d:'洗碗速度 +40%',m:(a,b)=>a==='clean'&&KITCH_ROLES.includes(b)},
+ {id:'boilWok',n:'合菜同時上齊',d:'煮、炒速度 +20%',m:(a,b)=>a==='boil'&&b==='wok'},
+ {id:'steamFry',n:'點心套餐加速',d:'蒸、炸速度 +20%',m:(a,b)=>a==='steam'&&b==='fry'},
+ {id:'fastPay',n:'吃完立刻結帳',d:'兩人都在外場：結帳速度加倍',m:(a,b)=>a==='floor'&&b==='floor'},
+ {id:'stockFlow',n:'食材不斷',d:'備料區食材快用完會自動補上',m:(a,b)=>a==='stock'&&KITCH_ROLES.includes(b)},
+ {id:'sameSpot',n:'同站默契',d:'同崗位速度 +25%',m:(a,b)=>a===b&&a!=='floor'&&a!=='rest'},
+];
+function findCombos(){
+  const on=G.staff.filter(s=>s.role!=='rest'),out=[];
+  for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++){const a=on[i],b=on[j];if(relOf(a,b)<60)continue;
+    for(const c of COMBOS)if(c.m(a.role,b.role)||c.m(b.role,a.role)){if(!out.some(o=>o.id===c.id))out.push({...c,who:a.name+'＋'+b.name})}}
+  return out;
+}
+function comboSetup(){
+  R.combo={};R.cmul={};const cs=findCombos();
+  for(const c of cs){R.combo[c.id]=c;
+    if(c.id==='plateHand')R.cmul.clean=1.4;
+    if(c.id==='boilWok'){R.cmul.boil=1.2;R.cmul.wok=1.2}
+    if(c.id==='steamFry'){R.cmul.steam=1.2;R.cmul.fry=1.2}
+    if(c.id==='fastPay')R.cmul.cash=2;
+    if(c.id==='sameSpot'){const on=G.staff.filter(s=>s.role!=='rest');for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++)
+      if(on[i].role===on[j].role&&relOf(on[i],on[j])>=60){const k=on[i].role==='prep'?'prep':on[i].role==='clean'?'clean':on[i].role;R.cmul[k]=(R.cmul[k]||1)*1.25}}}
+  if(cs.length&&!TUT)setTimeout(()=>toast('✨ 連攜技：'+cs.map(c=>c.n).join('、'),3.5),600);
+}
+function comboTick(dt){
+  if(!R.combo)return;
+  if(R.combo.busSink)R.tables.forEach(t=>{if(!t.c&&t.dirty>0&&!t.res){t.auto=(t.auto||0)+dt;if(t.auto>=1.5){R.sinkDirty+=t.dirty;t.dirty=0;t.auto=0;fx(t.x,t.y-40,'✨ 直送水槽','#2f6fa8')}}else t.auto=0});
+  if(R.combo.stockFlow){R.sfT=(R.sfT||0)+dt;if(R.sfT>=4){R.sfT=0;for(const k in G.bench)if(G.bench[k]<2&&G.stock[k]>0){const n=Math.min(3,G.stock[k]);G.stock[k]-=n;G.bench[k]+=n;fx(SPOTS.shelf.x,SPOTS.shelf.y-50,'✨ '+k+' +'+n,'#3f8f5a')}}}
+}
+// 每場結束：同班變熟、相剋會吵、好朋友同班心情好
+function relAfterMeal(notes){
+  const on=G.staff.filter(s=>s.role!=='rest');
+  for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++){const a=on[i],b=on[j],c=clash(a,b);
+    const v0=relOf(a,b);relAdd(a,b,c?-3:(a.traits.includes('樂天')||b.traits.includes('樂天')?5:4));
+    const v=relOf(a,b);
+    if(v0<60&&v>=60)notes.push('💛 '+a.name+'和'+b.name+'變成好朋友了！排在同一場、崗位搭得上會發動連攜技');
+    if(v0>-30&&v<=-30)notes.push('⚡ '+a.name+'和'+b.name+'處不來，同一場上班心情會變差');
+    if(v>=60){a.mood=Math.min(100,a.mood+3);b.mood=Math.min(100,b.mood+3)}
+    else if(v<=-30){a.mood=Math.max(0,a.mood-3);b.mood=Math.max(0,b.mood-3)}}
+}
+// 有人離開：好朋友心情大掉，感情太好的可能一起走
+function friendsLeave(s,notes){
+  const out=[];
+  for(const o of G.staff){if(o===s)continue;const v=relOf(s,o);
+    if(v>=60){o.mood=Math.max(0,o.mood-20);if(v>=85&&Math.random()<.3)out.push(o)}}
+  out.forEach(o=>{G.staff=G.staff.filter(x=>x!==o);(notes||[]).push(o.name+' 跟著好朋友 '+s.name+' 一起走了');toast(o.name+' 跟著 '+s.name+' 一起離職了…',4)});
+}
 
 /* ---------- 新手教學（老員工帶你走一遍） ---------- */
 let TUT=null;
@@ -1321,11 +1397,12 @@ function drawEvents(){
 // 場間事件
 function staffPick(n){return shuffle(G.staff).slice(0,n)}
 const BETWEEN_EV=[
- {ok:()=>!evSafe()&&G.staff.length>=2,run(next){const [a,b]=staffPick(2);
+ {ok:()=>!evSafe()&&G.staff.length>=2,run(next){let pairs=[];G.staff.forEach((x,i)=>G.staff.slice(i+1).forEach(y=>pairs.push([x,y,relOf(x,y)+(clash(x,y)?-30:0)+Math.random()*40])));
+   pairs.sort((p,q)=>p[2]-q[2]);const [a,b]=pairs[0];
    evBox('😤 員工吵架',`${a.name}和${b.name}為了誰該收桌子吵起來了，兩個人都在等你表態。`,[
-    {t:'站'+a.name+'那邊',f(){a.mood=Math.min(100,a.mood+10);b.mood=Math.max(1,b.mood-15);next()}},
-    {t:'站'+b.name+'那邊',f(){b.mood=Math.min(100,b.mood+10);a.mood=Math.max(1,a.mood-15);next()}},
-    {t:'把兩個人叫來調解',f(){if(Math.random()<.5){a.mood=Math.min(100,a.mood+5);b.mood=Math.min(100,b.mood+5);toast('兩個人握手和好了')}else{a.mood=Math.max(1,a.mood-8);b.mood=Math.max(1,b.mood-8);toast('越吵越兇，兩個都不爽')}next()}}])}},
+    {t:'站'+a.name+'那邊',f(){a.mood=Math.min(100,a.mood+10);b.mood=Math.max(1,b.mood-15);relAdd(a,b,-10);next()}},
+    {t:'站'+b.name+'那邊',f(){b.mood=Math.min(100,b.mood+10);a.mood=Math.max(1,a.mood-15);relAdd(a,b,-10);next()}},
+    {t:'把兩個人叫來調解',f(){if(Math.random()<.5){a.mood=Math.min(100,a.mood+5);b.mood=Math.min(100,b.mood+5);relAdd(a,b,15);toast('兩個人握手和好了')}else{a.mood=Math.max(1,a.mood-8);b.mood=Math.max(1,b.mood-8);relAdd(a,b,-10);toast('越吵越兇，兩個都不爽')}next()}}])}},
  {ok:()=>!evSafe()&&G.staff.some(s=>s.role!=='rest'),run(next){const s=pick(G.staff.filter(x=>x.role!=='rest')),sick=s.stam<45;
    const rest=()=>{s.backRole=s.role;s.role='rest'};
    if(sick)return evBox('🤒 病假',`${s.name}累壞了，發燒請病假，這一場不能上班。`,[{t:'好好休息',f(){rest();s.mood=Math.min(100,s.mood+5);next()}}]);
