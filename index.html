@@ -201,6 +201,7 @@ SPOTS.tray={x:735,y:172,r:28,sx:735,sy:176};
 SPOTS.shelf={x:928,y:600,r:32,sx:928,sy:604};
 const TRAY_MAX=5, KITCHEN=[...PREP,...STOVES,'sink'], EXPAND_COST=60000, NEW_STOVE_COST=15000;
 SPOTS.cash={x:300,y:182,r:44,sx:300,sy:186};
+SPOTS.door={x:66,y:586,r:30,sx:66,sy:590}; // 門口招牌：老闆走過去切換 營業中／暫停收客
 TABLES.forEach((t,i)=>SPOTS['t'+i]={x:t.x,y:t.y,r:62,sx:t.x,sy:t.y+46});
 const SLOT=[[-20,4],[20,4],[0,24]], CAP=3;
 const STOVE_COST=[10000,30000,80000,200000,500000], STOVE_SPD=[0,.8,1,1.2,1.4,1.6], STOVE_NM=['','舊','普通','商用','專業','頂級'];
@@ -400,10 +401,14 @@ function update(dt){
   R.t+=dt;
   if(R.battle)battleTick(dt);
   const PWR=R.battle&&R.battle.deb.power>0, WTR=R.battle&&R.battle.deb.water>0;
-  while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();spawnGroup()}
+  while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();if(R.closed)R.skipped=(R.skipped||0)+1;else spawnGroup()}
   // 老闆
   moveBoss(dt);
   R.bossSpot=spotAt(R.boss); R.claims=bossClaims();
+  if(R.bossSpot==='door'&&R.prevSpot!=='door'){R.closed=!R.closed;
+    fx(SPOTS.door.x+40,SPOTS.door.y-70,R.closed?'暫停收客':'恢復營業',R.closed?'#c2412d':'#3d8b5a');
+    toast(R.closed?'門口掛上「暫停收客」，店裡的客人照常服務':'招牌翻回「營業中」，客人又會進來了',2.5)}
+  R.prevSpot=R.bossSpot;
   bossActions(dt);
   // 每個崗位最多 3 人（老闆在的話先佔一位）
   R.plan=prepPlan();
@@ -766,7 +771,7 @@ function draw(){
   if(pK){ctx.fillStyle=pK;ctx.fillRect(600,150,400,490);ctx.fillStyle='#9fb5a822';ctx.fillRect(600,150,400,490)}
   else{ctx.fillStyle='#d3dcd4';ctx.fillRect(600,150,400,490);ctx.strokeStyle='#bcc8bf';ctx.lineWidth=1;for(let x=600;x<=W;x+=28){ctx.beginPath();ctx.moveTo(x,150);ctx.lineTo(x,H);ctx.stroke()}for(let y=150;y<H;y+=28){ctx.beginPath();ctx.moveTo(600,y);ctx.lineTo(W,y);ctx.stroke()}}
   ctx.fillStyle='#9a7350';ctx.fillRect(596,150,6,H-150);
-  drawSpots();
+  drawSpots(); drawDoorSign();
   if(!z.hud)drawOrders();
   // 備餐區（長吧台）
   ctx.fillStyle='#8a6a4a';ctx.fillRect(0,98,800,56);ctx.fillStyle='#b48a5e';ctx.fillRect(0,98,800,8);
@@ -873,6 +878,14 @@ function draw(){
   for(const f of R.fx){ctx.globalAlpha=Math.min(1,f.t);if(f.img)spr(f.img,f.x,f.y,f.img==='perfect'?44:40);else label(f.txt,f.x,f.y,f.col,15,true);ctx.globalAlpha=1}
   if(z.hud){ctx.setTransform(d*z.hs,0,0,d*z.hs,0,0);const vw=VIEW.cw/z.hs;drawOrders(vw);drawStats(true,vw)}
   if(selected){ctx.setTransform(d,0,0,d,0,0);ctx.fillStyle='#fffdf6e6';rr(VIEW.cw/2-150,VIEW.ch-30,300,24,12);ctx.fill();label('已選 '+selected.name+'：點崗位圈圈調派',VIEW.cw/2,VIEW.ch-13,'#c2412d',13,true)}
+}
+function drawDoorSign(){
+  const d=SPOTS.door, x=d.x-24, y=d.y-56, cl=!!R.closed;
+  ctx.fillStyle='#5b3a24';ctx.fillRect(x-2,y+14,4,26);
+  ctx.fillStyle=cl?'#c2412d':'#3d8b5a';ctx.strokeStyle='#2a2420';ctx.lineWidth=2;
+  ctx.beginPath();ctx.roundRect?ctx.roundRect(x-34,y-14,68,28,6):ctx.rect(x-34,y-14,68,28);ctx.fill();ctx.stroke();
+  label(cl?'暫停收客':'營業中',x,y+5,'#fff',cl?13:14,true);
+  label(cl?'走進圈圈恢復':'走進圈圈暫停',d.x,d.y+d.r+11,'#2a2420',11,true);
 }
 function drawSpots(){
   const b=R.boss, now=performance.now()/1000, dest=b.tx!=null?spotAt({x:b.tx,y:b.ty}):null;
