@@ -312,7 +312,7 @@ function prepPlan(){
   const riceLoad=riceDef>0&&!G.cooker?Math.max(0,G.ready.rice_wash-need.rice_wash):0;
   const cutMeat=Math.max(0,tgt.meat_cut+marLoad-G.ready.meat_cut);
   const cutVeg=Math.max(0,tgt.veg_cut-G.ready.veg_cut);
-  const washVeg=Math.max(0,cutVeg-G.ready.veg_wash);
+  const washVeg=Math.max(0,tgt.veg_wash+cutVeg-G.ready.veg_wash); // 燙青菜這類直接用洗好的菜，也要算進去
   const washSea=Math.max(0,tgt.sea_wash-G.ready.sea_wash);
   const beat=Math.max(0,tgt.egg_beat-G.ready.egg_beat);
   const washRice=(riceDef>0&&!G.cooker&&riceLoad<=0)||G.ready.rice_wash<tgt.rice_wash;
@@ -325,7 +325,7 @@ const JOBS={
         ['veg',1.5,P=>P.washVeg>0&&G.bench['蔬菜']>0,P=>{G.bench['蔬菜']--;G.ready.veg_wash++},'洗菜'],
         ['rice',1.5,P=>P.washRice&&G.bench['米麵']>0,P=>{const n=Math.min(10,G.bench['米麵']);G.bench['米麵']-=n;G.ready.rice_wash+=n},'洗米']],
   cut:[['meat',2,P=>P.cutMeat>0&&G.bench['肉']>0,P=>{G.bench['肉']--;G.ready.meat_cut++},'切肉'],
-       ['veg',1.5,P=>P.cutVeg>0&&G.ready.veg_wash>0,P=>{G.ready.veg_wash--;G.ready.veg_cut++},'切菜']],
+       ['veg',1.5,P=>P.cutVeg>0&&G.ready.veg_wash>P.need.veg_wash,P=>{G.ready.veg_wash--;G.ready.veg_cut++},'切菜']],
   beat:[['egg',1,P=>P.beat>0&&G.bench['蛋奶']>0,P=>{G.bench['蛋奶']--;G.ready.egg_beat++},'打蛋']],
   rice:[['load',.8,P=>P.riceLoad>0,P=>{const n=Math.min(10,P.riceLoad);G.ready.rice_wash-=n;G.cooker={n,t:30};},'米下鍋']],
   mar:[['load',.7,P=>P.marLoad>0&&G.ready.meat_cut>0,P=>{G.ready.meat_cut--;G.mar.push(20)},'放進醃料']],
