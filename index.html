@@ -1344,30 +1344,64 @@ function coopHostTick(dt){
   const msg=!R?'店長正在準備…':$('overlay').style.display!=='none'?(($('panel').querySelector('h1')||{}).textContent||'店長正在準備…'):'暫停中';
   try{nr.presence(live?{role:'host',nm:COOP.name,ph:'meal',s:encodeSnap(),msg:null}:{role:'host',nm:COOP.name,ph:'wait',msg:String(msg).slice(0,60),s:null}).catch(()=>{})}catch(e){}
 }
+
+/* ---------- 免登入連線（點對點，網站版用） ---------- */
+const PEER_SRC='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+let PEER_OPT={};
+function loadPeer(){return new Promise((ok,no)=>{if(window.Peer)return ok();const s=document.createElement('script');s.src=PEER_SRC;s.onload=()=>window.Peer?ok():no();s.onerror=no;document.head.appendChild(s);setTimeout(no,8000)})}
+// 做出跟 Claude 房間一樣的介面：presence() / peers() / leave()
+function p2pRoom(peer){
+  let mine={},theirs=null,conn=null;
+  const nr={
+    presence:async p=>{for(const k in p){if(p[k]===null)delete mine[k];else mine[k]=p[k]}if(conn&&conn.open)try{conn.send(mine)}catch(e){}},
+    peers:()=>[{sameTab:true,presence:mine},...(theirs?[{sameTab:false,presence:theirs}]:[])],
+    leave:async()=>{try{peer.destroy()}catch(e){}},
+    attach(c){conn=c;c.on('data',d=>{if(d&&typeof d==='object')theirs=d});c.on('open',()=>{try{c.send(mine)}catch(e){}});c.on('close',()=>{if(conn===c){theirs=null;conn=null}})}};
+  return nr;
+}
+function p2pHost(code){return new Promise((ok,no)=>{
+  const peer=new Peer('zaoka-'+code.toLowerCase(),PEER_OPT),nr=p2pRoom(peer);
+  peer.on('open',()=>ok(nr));
+  peer.on('connection',c=>nr.attach(c));
+  peer.on('error',e=>no(e&&e.type||'error'));
+  setTimeout(()=>no('timeout'),10000)})}
+function p2pJoin(code){return new Promise((ok,no)=>{
+  const peer=new Peer(undefined,PEER_OPT),nr=p2pRoom(peer);
+  peer.on('open',()=>{const c=peer.connect('zaoka-'+code.toLowerCase(),{serialization:'json',reliable:true});nr.attach(c);c.on('open',()=>ok(nr))});
+  peer.on('error',e=>no(e&&e.type||'error'));
+  setTimeout(()=>no('timeout'),12000)})}
+
 async function openCoop(){
   showOverlay(`<h1>🤝 合作模式</h1><p>連線中…</p>`);
   const room=await getRoom();
-  if(!room){showOverlay(`<h1>🤝 合作模式</h1><p>這個畫面連不上合作房間。</p><p class="small">合作模式只能在 Claude 上的分享連結玩，兩個人都要登入 Claude。GitHub 全螢幕版不支援。</p><div class="foot"><button class="btn" id="bBk">回開店畫面</button></div>`);$('bBk').onclick=showTitle;return}
+  let p2p=false;
+  if(!room&&!window.claude){try{await loadPeer();p2p=true}catch(e){}}
+  const SITE='https://andydan26-cpu.github.io/zaoka/';
+  if(!room&&!p2p){showOverlay(`<h1>🤝 合作模式</h1><p>這個畫面沒辦法連線。</p><p>不用登入的話，請兩個人都打開網站版：</p><p style="font-size:17px"><b>${SITE}</b></p><div class="foot"><button class="btn" id="bBk">回開店畫面</button></div>`);$('bBk').onclick=showTitle;return}
+  const T=room?{host:c=>room.join('zc-'+c.toLowerCase()),join:c=>room.join('zc-'+c.toLowerCase())}:{host:p2pHost,join:p2pJoin};
   const name=lsGet('zaoka_name')||('老闆'+ri(10,99));
   showOverlay(`<h1>🤝 合作模式</h1><p>兩個人顧同一家店：店長負責排班、進貨、決定事情；夥伴跟店長一起在店裡跑。兩個老闆都可以點餐、做菜、端菜、收碗、結帳。</p>
    <div class="box row" style="margin:8px 0"><span>你的暱稱</span><input id="cpName" value="${esc(name)}" maxlength="10" style="font-size:15px;padding:6px;border-radius:6px;border:1px solid var(--line);flex:1;margin-left:8px"></div>
    <div class="grid"><div class="box"><b>我當店長（開房）</b><p class="small">用你目前的存檔開店，產生房號給朋友。</p><button class="btn" id="cpHost">開房</button></div>
    <div class="box"><b>我當夥伴（加入）</b><p class="small">輸入朋友給的 4 碼房號。</p><input id="cpCode" maxlength="4" placeholder="房號" style="font-size:18px;width:100px;padding:6px;text-transform:uppercase;border-radius:6px;border:1px solid var(--line)"> <button class="btn" id="cpJoin">加入</button></div></div>
+   <p class="small">${room?'目前用 Claude 房間連線，兩個人都要登入 Claude。朋友沒有 Claude 帳號的話，兩個人改開網站版 '+SITE+' 就不用登入。':'免登入連線：兩個人都要打開網站版 '+SITE+'。少數公司或學校網路會擋，換手機網路通常就可以。'}</p>
    <div class="foot"><button class="btn ghost" id="bBk">返回</button></div>`);
   $('bBk').onclick=showTitle;
   const nm=()=>{const v=($('cpName').value||'').trim().slice(0,10)||name;lsSet('zaoka_name',v);return v};
   $('cpHost').onclick=async()=>{const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[ri(0,31)]).join('');const n=nm();
-    try{const nr=await room.join('zc-'+code.toLowerCase());COOP={role:'host',nr,code,name:n};nr.presence({role:'host',nm:n,ph:'wait',msg:'店長正在準備…'}).catch(()=>{});coopHostLobby()}
-    catch(e){toast('開房失敗，請再試一次')}};
+    $('cpHost').disabled=true;$('cpHost').textContent='開房中…';
+    try{const nr=await T.host(code);COOP={role:'host',nr,code,name:n};nr.presence({role:'host',nm:n,ph:'wait',msg:'店長正在準備…'}).catch(()=>{});coopHostLobby()}
+    catch(e){toast('開房失敗，請再試一次');const b=$('cpHost');if(b){b.disabled=false;b.textContent='開房'}}};
   $('cpJoin').onclick=async()=>{const code=($('cpCode').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==4)return toast('房號是 4 碼');const n=nm();
-    try{const nr=await room.join('zc-'+code.toLowerCase());COOP={role:'guest',nr,code,name:n,seq:0};R=null;paused=true;
+    $('cpJoin').disabled=true;$('cpJoin').textContent='連線中…';
+    try{const nr=await T.join(code);COOP={role:'guest',nr,code,name:n,seq:0};R=null;paused=true;
       nr.presence({role:'guest',nm:n}).catch(()=>{});coopWait('等店長開店…')}
-    catch(e){toast('加入失敗，請確認房號')}};
+    catch(e){toast(e==='peer-unavailable'?'找不到這個房號，請確認店長已經開房':'加入失敗，請確認房號再試一次',3);const b=$('cpJoin');if(b){b.disabled=false;b.textContent='加入'}}};
 }
 function coopHostLobby(){
   const draw=()=>{if(!COOP||COOP.role!=='host')return;const g=COOP.nr.peers().find(p=>!p.sameTab&&p.presence&&p.presence.role==='guest');
     showOverlay(`<h1>🤝 合作模式・店長</h1><p>把房號告訴朋友：</p><div style="font-size:44px;font-family:var(--f-display);letter-spacing:.2em;color:var(--red);text-align:center">${COOP.code}</div>
-     <p style="text-align:center">${g?'✅ '+esc(String(g.presence.nm||'夥伴'))+' 已加入':'⏳ 等朋友加入…（他要打開同一個連結、按「合作模式」→ 加入）'}</p>
+     <p style="text-align:center">${g?'✅ '+esc(String(g.presence.nm||'夥伴'))+' 已加入':'⏳ 等朋友加入…（他要打開同一個網址、按「合作模式」→ 加入）'}</p>
      <p class="small">用你目前的存檔開店。合作中只有你能排班、進貨、處理事件；夥伴在店裡跟你一起跑。</p>
      <div class="foot"><button class="btn ghost" id="bCoopLeave">取消</button><button class="btn" id="cpGo">${g?'開始合作':'先自己開店'}</button></div>`);
     $('bCoopLeave').onclick=leaveCoop;$('cpGo').onclick=()=>{clearInterval(COOP.lobbyT);let has=false;try{has=!!localStorage.getItem('zaoka')}catch(e){}
