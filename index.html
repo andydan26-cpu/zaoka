@@ -261,6 +261,7 @@ function startMeal(){
   const md=DISHES.filter(d=>G.menu.includes(d.id)), pr=md.reduce((s,d)=>s+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);
   let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
   if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
+  delete SPOTS.roach;
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
   const base=[10,16,14][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
   for(let i=0;i<n;i++){const u=Math.random();
@@ -410,7 +411,7 @@ function update(dt){
   // 老闆
   moveBoss(dt);
   R.bossSpot=spotAt(R.boss); R.claims=bossClaims();
-  if(R.bossSpot==='door'&&R.prevSpot!=='door'){R.closed=!R.closed;
+  if(R.bossSpot==='door'&&R.prevSpot!=='door'&&!(R.ev&&R.ev.power>0)){R.closed=!R.closed;
     fx(SPOTS.door.x+40,SPOTS.door.y-70,R.closed?'暫停收客':'恢復營業',R.closed?'#c2412d':'#3d8b5a');
     toast(R.closed?'門口掛上「暫停收客」，店裡的客人照常服務':'招牌翻回「營業中」，客人又會進來了',2.5)}
   R.prevSpot=R.bossSpot;
@@ -565,20 +566,23 @@ function custUpdate(c,dt){
 function settlePay(c,opt){
   if(!opt&&R.ev&&R.ev.wallet&&R.t<R.dur&&!R.battle){R.ev.wallet=false;
     evBox('👛 客人忘帶錢包','結帳時客人一臉尷尬：錢包忘在家裡了。',[
-      {t:'算了，放他走',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢',f(){settlePay(c,'phone')}}],true);return}
+      {t:'算了，放他走（他可能會回來付）',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢（他可能給一星）',f(){settlePay(c,'phone')}}],true);return}
   R.payQ=R.payQ.filter(x=>x!==c);
-  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0); if(opt==='free')sum=0;
+  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0);
+  const back=opt==='free'&&Math.random()<.5, mad=opt==='phone'&&Math.random()<.4;
+  if(opt==='free'&&!back)sum=0;
+  if(back)setTimeout(()=>toast('剛剛忘帶錢包的客人跑回來把錢付清了！',3),400);
   const ct=CTYPE[c.type];
   const q=c.qs.reduce((a,b)=>a+b,0)/c.qs.length;
   const pr=c.dishes.reduce((s,id)=>s+G.prices[id]/DMAP[id].ref,0)/c.dishes.length;
   let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2;
   s=clamp(Math.round(s),1,5);
-  if(opt==='free')s=5; else if(opt==='phone')s=Math.min(s,2);
+  if(opt==='free')s=5; else if(mad)s=1;
   let tip=0; if(s>=5&&Math.random()<.5)tip=Math.round(sum*.1);
   R.rev+=sum; R.tips+=tip; R.served++; G.today.served++; G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   fx(ST.cash.x,ST.cash.y-30,'+'+(sum+tip),'#3f8f5a');
   const txt=s>=5?pick(['好吃到想再來','跟阿嬤做的味道一樣','上菜好快']):s>=4?pick(['不錯吃','價錢合理']):s>=3?pick(['普普','還可以']):pick(['等有點久','有點貴','味道普通']);
-  addReview(s,ct.w,opt==='free'?'老闆人超好，下次一定來':opt==='phone'?'被當成小偷':txt);
+  addReview(s,ct.w,opt==='free'?'老闆人超好，下次一定來':mad?'扣我手機，當我是小偷':txt);
   if(c.inf){if(s>=4){addReview(5,8,'網紅大推：必吃老店');toast('網紅發文大推！評價大漲',3)}else{addReview(1,6,'網紅：普普通通');toast('網紅不太滿意…',3)}}
   if(s>=5)R.fx.push({x:ST.cash.x,y:ST.cash.y+40,img:'perfect',t:1.4});
   c.st='leave';
@@ -1138,7 +1142,7 @@ function showPrep(){
   let h=`<h1>第 ${G.day} 天・${MEALS[G.meal]} 準備</h1>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    <h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>
-   <h2>進貨</h2><div class="grid">${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
+   <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
    <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.map(priceRow).join('')}</div>`;
   if(day){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
@@ -1155,6 +1159,7 @@ function showPrep(){
   showOverlay(h,'prep');
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
+  P.querySelectorAll('[data-plate]').forEach(b=>b.onclick=()=>{const n=+b.dataset.plate,c=n*80;if(G.cash<c)return toast('現金不夠');G.cash-=c;G.plates+=n;G.platesLost=Math.max(0,(G.platesLost||0)-n);showPrep()});
   P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
@@ -1206,17 +1211,24 @@ const MEAL_EV=[
  {id:'water',ok:()=>!evSafe(),run(){R.ev.water=25;
    evBox('🚱 停水','整條街停水，洗菜槽和洗碗槽都不能用，大約 25 秒後恢復。',
    [{t:'叫水電行接水（1,500，5 秒）',f(){G.cash-=1500;R.ev.water=5}},{t:'等它恢復'}],true)}},
- {id:'power',ok:()=>!evSafe(),run(){R.ev.power=12;fx(800,330,'⚡ 跳電！','#b8352a');toast('跳電了！廚房停擺 12 秒',3)}},
- {id:'plates',ok:()=>!evSafe()&&G.plates>3,run(){const n=Math.min(G.plates,6);G.plates-=n;fx(ST.plates?ST.plates.x:150,170,'💥 盤子破了 -'+n,'#b8352a');toast('砰！一疊盤子摔破了，乾淨盤子少了 '+n+' 個',3)}},
- {id:'roach',ok:()=>!evSafe(),run(){evBox('🪳 蟑螂出沒','客人尖叫：地上有蟑螂！',
-   [{t:'馬上請人除蟲（1,000）',f(){G.cash-=1000;toast('處理掉了，客人鬆一口氣')}},
-    {t:'不管它',f(){R.cust.forEach(c=>{if(['queue','order','wait'].includes(c.st))c.pat=Math.max(1,c.pat-c.patMax*.25)});addReview(2,3,'看到蟑螂')}}],true)}},
+ {id:'power',ok:()=>!evSafe(),run(){R.ev.power=1;R.ev.pfix=0;fx(800,330,'⚡ 跳電！','#b8352a');toast('跳電了！廚房全停，快去門口電箱把開關扳回來',4)}},
+ {id:'plates',ok:()=>!evSafe()&&G.plates>3,run(){const n=Math.min(G.plates,6);G.plates-=n;G.platesLost=(G.platesLost||0)+n;fx(ST.plates?ST.plates.x:150,170,'💥 盤子破了 -'+n,'#b8352a');toast('砰！一疊盤子摔破了，少了 '+n+' 個。休息時間可以去補買',3.5)}},
+ {id:'roach',ok:()=>!evSafe()&&!R.ev.roach,run(){const spots=[[280,250],[280,420],[520,420],[300,600],[540,270]],q=pick(spots);
+   R.ev.roach={x:q[0],y:q[1],t:0,p:0,next:6};SPOTS.roach={x:q[0],y:q[1],r:26,sx:q[0],sy:q[1]+4};
+   toast('🪳 有蟑螂！老闆走過去踩 3 秒，拖越久客人越不爽',4)}},
  {id:'wallet',ok:()=>!evSafe(),run(){R.ev.wallet=true}},
 ];
 function mealEvTick(dt){
   const E=R.ev; if(!E)return;
   if(E.at!=null&&R.t>=E.at&&!R.battle){E.at=null;const c=MEAL_EV.filter(e=>e.ok());if(c.length)pick(c).run()}
-  E.water=Math.max(0,E.water-dt);E.power=Math.max(0,E.power-dt);
+  E.water=Math.max(0,E.water-dt);
+  if(E.power>0&&R.bossSpot==='door'){E.pfix+=dt/2;R.boss.act={x:SPOTS.door.x,y:SPOTS.door.y-62};R.boss.actT=E.pfix;
+    if(E.pfix>=1){E.power=0;toast('電箱開關扳回來，恢復供電！');fx(R.boss.x,R.boss.y-50,'💡 來電了','#3f8f5a')}}
+  if(E.roach){const r=E.roach;r.t+=dt;
+    if(R.bossSpot==='roach'){r.p+=dt/3;R.boss.act={x:SPOTS.roach.x,y:SPOTS.roach.y-50};R.boss.actT=r.p;
+      if(r.p>=1){E.roach=null;delete SPOTS.roach;toast('蟑螂解決了！');fx(R.boss.x,R.boss.y-50,'✔ 除蟲完成','#3f8f5a')}}
+    else if(r.t>=r.next){r.next+=12;R.cust.forEach(c=>{if(['queue','order','wait'].includes(c.st))c.pat=Math.max(1,c.pat-c.patMax*.12)});
+      addReview(1,2,'店裡有蟑螂');fx(r.x,r.y-30,'客人看到蟑螂了！','#b8352a')}}
   if(E.broken){
     if(E.callT>0){E.callT-=dt;if(E.callT<=0){toast('師傅修好了');E.broken=null}}
     else if(R.bossSpot===E.broken){E.fixP+=dt/6;R.boss.act={x:ST[E.broken].x,y:ST[E.broken].y-62};R.boss.actT=E.fixP;
@@ -1225,10 +1237,12 @@ function mealEvTick(dt){
 }
 function drawEvents(){
   const E=R.ev; if(!E)return;
-  if(E.power>0){ctx.fillStyle='#0008';ctx.fillRect(600,150,400,490);label('⚡ 跳電中 '+Math.ceil(E.power)+' 秒',800,380,'#ffd84a',26,true)}
+  if(E.power>0){ctx.fillStyle='#0008';ctx.fillRect(600,150,400,490);label('⚡ 跳電中',800,370,'#ffd84a',26,true);label('去門口電箱修（2 秒）',800,402,'#ffd84a',16,true);
+    const d=SPOTS.door;ctx.fillStyle='#ffd84a';rr(d.x-34,d.y-30,68,20,6);ctx.fill();label('⚡ 電箱',d.x,d.y-15,'#2a2420',12,true)}
   if(E.water>0){for(const k of ['wash','sink']){const s=ST[k];ctx.fillStyle='#2f6fa8cc';rr(s.x-34,s.y-18,68,22,8);ctx.fill();label('🚱 停水 '+Math.ceil(E.water),s.x,s.y-2,'#fff',11,true)}}
   if(E.broken){const s=ST[E.broken];ctx.fillStyle='#b8352a';rr(s.x-44,s.y-58,88,22,8);ctx.fill();
     label(E.callT>0?'🔧 師傅 '+Math.ceil(E.callT)+' 秒到':'🔧 故障・站上去修',s.x,s.y-42,'#fff',11,true)}
+  if(E.roach){const r=E.roach,w=Math.sin(performance.now()/90)*3;ctx.font='24px serif';ctx.textAlign='center';ctx.fillText('🪳',r.x+w,r.y+8);label('除蟲 3 秒',r.x,r.y+34,'#b8352a',11,true)}
   for(const c of R.cust)if(c.inf&&c.st!=='gone'){const t=['order','wait','eat'].includes(c.st)?R.tables[c.table]:c;label('📸 網紅',t.x,t.y-(t===c?40:84),'#c2412d',13,true)}
 }
 // 場間事件
