@@ -235,7 +235,7 @@ function newGame(){
   rollPool();
 }
 const top3=a=>Object.values(a).sort((x,y)=>y-x).slice(0,3).reduce((s,v)=>s+v,0);
-const salary=s=>Math.round((500+top3(s.abil)*15)/10); // 原型：企劃公式的 1/10
+const salary=s=>Math.round((500+top3(s.abil)*15)/10*(s.raise||1)); // 原型：企劃公式的 1/10
 const stars=()=>{const r=G.reviews.slice(-40);return r.reduce((a,b)=>a+b,0)/r.length};
 
 function makeCand(){
@@ -260,6 +260,8 @@ function startMeal(){
   // 客量
   const md=DISHES.filter(d=>G.menu.includes(d.id)), pr=md.reduce((s,d)=>s+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);
   let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
+  if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
+  R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
   const base=[10,16,14][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
   for(let i=0;i<n;i++){const u=Math.random();
     R.spawns.push(m===1?150*Math.pow(u,1.6):m===2?150*Math.sqrt(u):150*u);}
@@ -269,13 +271,14 @@ function startMeal(){
   if(G.tutorial) toast('食材架拿食材→備料區處理→切好區拿去爐具',6);
 }
 function spawnGroup(){
-  const m=G.meal, r=Math.random();
-  const type = r< (m===2?.1:.07) ? 'foodie' : r < (m===2?.62:.3) ? 'family':'office';
+  const m=G.meal, r=Math.random(), inf=R.ev&&R.ev.infNext; if(inf)R.ev.infNext=false;
+  const type = inf?'foodie': r< (m===2?.1:.07) ? 'foodie' : r < (m===2?.62:.3) ? 'family':'office';
   const ct=CTYPE[type];
   const c={id:R.cid++,type,party:ri(...ct.party),st:'queue',x:DOOR.x,y:DOOR.y,pat:ct.pat*.8,patMax:ct.pat*.8,
     table:null,dishes:[],servedN:0,eatT:0,col:ct.col,heads:[]};
   for(let i=0;i<c.party;i++)c.heads.push(pick(HEADS));
   c.spr=c.heads.map(()=>ri(0,4));
+  if(inf){c.inf=true;c.party=1;c.heads=c.heads.slice(0,1);c.spr=c.spr.slice(0,1)}
   R.cust.push(c);
 }
 const patMul=()=>1;
@@ -360,6 +363,7 @@ function takeOrder(c){
 function leaveAngry(c,why,payComp=true){
   if(payComp){const v=60*c.party;R.comp+=v;fx(c.x,c.y,'-'+v,'#b8352a')}
   R.angry++; addReview(1,CTYPE[c.type].w,why);
+  if(c.inf){addReview(1,8,'網紅：'+why);toast('網紅氣走了，負評擴散中…',3)}
   cancelTickets(c);
   if(c.table!=null){const t=R.tables[c.table];t.dirty+=c.servedN;t.c=null;}
   c.st='leave';
@@ -400,7 +404,8 @@ function headTicket(st){return R.tickets.find(t=>t.st==='queued'&&t.steps[t.si]=
 function update(dt){
   R.t+=dt;
   if(R.battle)battleTick(dt);
-  const PWR=R.battle&&R.battle.deb.power>0, WTR=R.battle&&R.battle.deb.water>0;
+  mealEvTick(dt);
+  const PWR=(R.battle&&R.battle.deb.power>0)||R.ev.power>0, WTR=(R.battle&&R.battle.deb.water>0)||R.ev.water>0;
   while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();if(R.closed)R.skipped=(R.skipped||0)+1;else spawnGroup()}
   // 老闆
   moveBoss(dt);
@@ -458,7 +463,7 @@ function update(dt){
      if(n<TRAY_MAX&&req.every(k=>have(k)>0)){req.forEach(k=>{if(k==='sauce')G.bench['調味']--;else G.ready[k]--});t.st='cut';t.res=null;t.q.push(clamp(G.pq,5,100));n++}
      else if(!R.waitMsg)R.waitMsg=n>=TRAY_MAX?'切好區滿了，快拿去爐具':DMAP[t.dish].short+' 還缺：'+req.filter(k=>have(k)<=0).map(k=>ITEM[k].n).join('、');}}
   // 爐具
-  for(const st of STOVES){ if(!owned(st)||PWR)continue;
+  for(const st of STOVES){ if(!owned(st)||PWR||R.ev.broken===st)continue;
     const t=headTicket(st); if(!t)continue;
     const fin=t.si===t.steps.length-1;
     if(t.prog>=1){ if(fin)tryFinish(t); continue;}
@@ -542,7 +547,7 @@ function custUpdate(c,dt){
   if(c.st==='queue'){
     const i=R.cust.filter(x=>x.st==='queue').indexOf(c);
     walk(c,{x:50+(i%5)*36,y:612-Math.floor(i/5)*30},140,dt);
-    c.pat-=dt/pm; if(c.pat<=0){c.st='leave';R.lost++;fx(c.x,c.y,'不等了','#d08a24');return}
+    c.pat-=dt/pm; if(c.pat<=0){c.st='leave';R.lost++;if(c.inf){addReview(1,8,'網紅：排隊排到走人');toast('網紅等不及走了，負評開始擴散',3)}fx(c.x,c.y,'不等了','#d08a24');return}
     const ti=R.tables.findIndex(t=>!t.c&&t.dirty===0);
     if(ti>=0&&i===0){c.table=ti;R.tables[ti].c=c;c.st='walkIn'}
   } else if(c.st==='walkIn'){
@@ -557,19 +562,24 @@ function custUpdate(c,dt){
     if(walk(c,DOOR,170,dt))c.st='gone';
   }
 }
-function settlePay(c){
+function settlePay(c,opt){
+  if(!opt&&R.ev&&R.ev.wallet&&R.t<R.dur&&!R.battle){R.ev.wallet=false;
+    evBox('👛 客人忘帶錢包','結帳時客人一臉尷尬：錢包忘在家裡了。',[
+      {t:'算了，放他走',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢',f(){settlePay(c,'phone')}}],true);return}
   R.payQ=R.payQ.filter(x=>x!==c);
-  const sum=c.dishes.reduce((s,id)=>s+G.prices[id],0);
+  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0); if(opt==='free')sum=0;
   const ct=CTYPE[c.type];
   const q=c.qs.reduce((a,b)=>a+b,0)/c.qs.length;
   const pr=c.dishes.reduce((s,id)=>s+G.prices[id]/DMAP[id].ref,0)/c.dishes.length;
   let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2;
   s=clamp(Math.round(s),1,5);
+  if(opt==='free')s=5; else if(opt==='phone')s=Math.min(s,2);
   let tip=0; if(s>=5&&Math.random()<.5)tip=Math.round(sum*.1);
   R.rev+=sum; R.tips+=tip; R.served++; G.today.served++; G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   fx(ST.cash.x,ST.cash.y-30,'+'+(sum+tip),'#3f8f5a');
   const txt=s>=5?pick(['好吃到想再來','跟阿嬤做的味道一樣','上菜好快']):s>=4?pick(['不錯吃','價錢合理']):s>=3?pick(['普普','還可以']):pick(['等有點久','有點貴','味道普通']);
-  addReview(s,ct.w,txt);
+  addReview(s,ct.w,opt==='free'?'老闆人超好，下次一定來':opt==='phone'?'被當成小偷':txt);
+  if(c.inf){if(s>=4){addReview(5,8,'網紅大推：必吃老店');toast('網紅發文大推！評價大漲',3)}else{addReview(1,6,'網紅：普普通通');toast('網紅不太滿意…',3)}}
   if(s>=5)R.fx.push({x:ST.cash.x,y:ST.cash.y+40,img:'perfect',t:1.4});
   c.st='leave';
 }
@@ -689,6 +699,7 @@ function endMeal(){
   if(R.boss.carry&&R.boss.carry.dirty)G.plates+=R.boss.carry.dirty;
   G.staff.forEach(s=>{if(s.rt&&s.rt.carry&&s.rt.carry.dirty)G.plates+=s.rt.carry.dirty;if(s.rt&&s.rt.carry&&s.rt.carry.basket)G.bench[s.rt.carry.basket]+=s.rt.carry.n});
   if(R.boss.carry&&R.boss.carry.basket)G.bench[R.boss.carry.basket]+=R.boss.carry.n;
+  G.lastDirty=R.sinkDirty+R.tables.reduce((a,t)=>a+t.dirty,0);
   const util=[...R.used].reduce((a,st)=>a+40+20*G.stoveLv[st],0);
   const working=G.staff.filter(s=>s.role!=='rest');
   const sal=working.reduce((a,s)=>a+salary(s),0);
@@ -704,6 +715,7 @@ function endMeal(){
     if(s.stam<=0)notes.push(s.name+' 累倒了');
     s.mood=clamp(s.mood,0,100);
   }
+  G.staff.forEach(s=>{if(s.backRole){s.role=s.backRole;delete s.backRole}});
   const res={rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
@@ -848,6 +860,7 @@ function draw(){
       if(c.st==='pay'){ctx.font='13px serif';ctx.fillText('💰',c.x,c.y-16)}}
   }
   if(R.battle)drawBattleField();
+  drawEvents();
   // 店寵
   {const d=R.dog;ctx.fillStyle='#0002';ctx.beginPath();ctx.ellipse(d.x,d.y+6,14,5,0,0,7);ctx.fill();
    ctx.save();ctx.translate(d.x,d.y);ctx.scale(-d.face,1);ctx.font='26px serif';ctx.textAlign='center';ctx.fillText('🐕',0,4);ctx.restore();
@@ -1034,7 +1047,7 @@ $('bOrder').onclick=()=>{
   if(!R||paused)return; paused=true;paused2=true;
   showOverlay(`<h1>緊急叫貨</h1><p>每次 5 份，價格是平常的 1.6 倍，約 12 秒後送到食材架。</p><div class="grid">${Object.keys(ING).map(k=>`<div class="box row"><span>${k}（庫存 ${G.stock[k]}）</span><button class="btn sm" data-k="${k}">$${fmt(ING[k]*5*1.6)}</button></div>`).join('')}</div>
    <div class="foot"><button class="btn ghost" id="bRes">回到營業</button></div>`);
-  $('panel').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k,c=Math.round(ING[k]*5*1.6);if(G.cash<c)return toast('現金不夠');G.cash-=c;R.orders.push({k,t:12});toggleClose()});
+  $('panel').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k,c=Math.round(ingP(k)*5*1.6);if(G.cash<c)return toast('現金不夠');G.cash-=c;R.orders.push({k,t:12});toggleClose()});
   $('bRes').onclick=toggleClose;
 };
 function toggleClose(){paused2=false;paused=false;hideOverlay();$('bPause').textContent='暫停'}
@@ -1083,7 +1096,7 @@ function showBetween(res,dayOver){
   if(res.reviews.length)h+=`<h2>客人評論</h2><div class="grid">${res.reviews.map(r=>`<div class="box">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}<br>${r.txt}</div>`).join('')}</div>`;
   if(res.notes.length)h+=`<p class="neg">${res.notes.join('；')}</p>`;
   showOverlay(h+`<div class="foot"><button class="btn" id="bNext">${dayOver?'進入新的一天':'準備下一場'}</button></div>`);
-  $('bNext').onclick=()=>showPrep();
+  $('bNext').onclick=()=>betweenEvent(showPrep);
 }
 
 let FIRE_ASK=null;
@@ -1125,7 +1138,7 @@ function showPrep(){
   let h=`<h1>第 ${G.day} 天・${MEALS[G.meal]} 準備</h1>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    <h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>
-   <h2>進貨</h2><div class="grid">${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ING[k]}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
+   <h2>進貨</h2><div class="grid">${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
    <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.map(priceRow).join('')}</div>`;
   if(day){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
@@ -1142,7 +1155,7 @@ function showPrep(){
   showOverlay(h,'prep');
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
-  P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ING[k]*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
+  P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
   P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(!capOk(cost+salary(c)))return;G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
@@ -1168,6 +1181,96 @@ function showPrep(){
     const weekEnd=G.day%7===0;G.day++;toast('店休一天，大家精神都回來了');
     if(weekEnd)weekSettle({title:'店休日',rev:0,comp:0,util:0,sal:0,served:0,angry:0,lost:0,reviews:[],notes:[]});else showPrep()};
   hud();
+}
+
+
+/* ---------- 隨機事件 ---------- */
+// 前 2 週新手保護：不發生負面事件
+const evSafe=()=>G.week<=2;
+const ingP=k=>Math.round(ING[k]*(G.priceUp&&G.priceUp.k===k&&G.day<=G.priceUp.until?1.5:1));
+function evBox(title,desc,opts,inMeal){
+  paused=true; if(inMeal)paused2=false;
+  showOverlay(`<h1>${title}</h1><p>${desc}</p><div class="foot">${opts.map((o,i)=>`<button class="btn${i?' ghost':''}" data-ev="${i}">${o.t}</button>`).join('')}</div>`);
+  $('panel').querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{const o=opts[+b.dataset.ev];const after=o.f&&o.f();
+    if(inMeal){if(after!=='keep')toggleClose()}});
+}
+// 營業中事件
+const MEAL_EV=[
+ {id:'inf',ok:()=>true,run(){R.ev.infNext=true;R.spawns.unshift(R.t+.2);
+   evBox('📸 美食網紅上門','一位有 30 萬粉絲的美食網紅正走進來。服務好、菜好吃，評價大漲；讓他等太久或走掉，負評會擴散。',[{t:'好，全力招呼'}],true)}},
+ {id:'tour',ok:()=>R.t<140,run(){evBox('🚌 旅行團 10 人','導遊打電話來：10 位團客 1 分鐘內到，要不要接？接了一次會湧進 3 組客人。',
+   [{t:'接！',f(){for(let i=0;i<3;i++)R.spawns.push(R.t+1+i*1.5);R.spawns.sort((a,b)=>a-b);R.ev.tour=true}},{t:'婉拒'}],true)}},
+ {id:'broken',ok:()=>!evSafe(),run(){const k=pick(G.stoves);R.ev.broken=k;R.ev.fixP=0;
+   evBox('🔧 爐具故障',STOVE_FULL[k]+'突然打不著火，上面的菜全部停住。',
+   [{t:'叫師傅來修（2,000，15 秒到）',f(){G.cash-=2000;R.ev.callT=15}},{t:'老闆自己修（走到爐具站 6 秒）'}],true)}},
+ {id:'water',ok:()=>!evSafe(),run(){R.ev.water=25;
+   evBox('🚱 停水','整條街停水，洗菜槽和洗碗槽都不能用，大約 25 秒後恢復。',
+   [{t:'叫水電行接水（1,500，5 秒）',f(){G.cash-=1500;R.ev.water=5}},{t:'等它恢復'}],true)}},
+ {id:'power',ok:()=>!evSafe(),run(){R.ev.power=12;fx(800,330,'⚡ 跳電！','#b8352a');toast('跳電了！廚房停擺 12 秒',3)}},
+ {id:'plates',ok:()=>!evSafe()&&G.plates>3,run(){const n=Math.min(G.plates,6);G.plates-=n;fx(ST.plates?ST.plates.x:150,170,'💥 盤子破了 -'+n,'#b8352a');toast('砰！一疊盤子摔破了，乾淨盤子少了 '+n+' 個',3)}},
+ {id:'roach',ok:()=>!evSafe(),run(){evBox('🪳 蟑螂出沒','客人尖叫：地上有蟑螂！',
+   [{t:'馬上請人除蟲（1,000）',f(){G.cash-=1000;toast('處理掉了，客人鬆一口氣')}},
+    {t:'不管它',f(){R.cust.forEach(c=>{if(['queue','order','wait'].includes(c.st))c.pat=Math.max(1,c.pat-c.patMax*.25)});addReview(2,3,'看到蟑螂')}}],true)}},
+ {id:'wallet',ok:()=>!evSafe(),run(){R.ev.wallet=true}},
+];
+function mealEvTick(dt){
+  const E=R.ev; if(!E)return;
+  if(E.at!=null&&R.t>=E.at&&!R.battle){E.at=null;const c=MEAL_EV.filter(e=>e.ok());if(c.length)pick(c).run()}
+  E.water=Math.max(0,E.water-dt);E.power=Math.max(0,E.power-dt);
+  if(E.broken){
+    if(E.callT>0){E.callT-=dt;if(E.callT<=0){toast('師傅修好了');E.broken=null}}
+    else if(R.bossSpot===E.broken){E.fixP+=dt/6;R.boss.act={x:ST[E.broken].x,y:ST[E.broken].y-62};R.boss.actT=E.fixP;
+      if(E.fixP>=1){grow(G.boss,E.broken,1);E.broken=null;toast('老闆自己修好了！');fx(R.boss.x,R.boss.y-50,'🔧 修好了','#3f8f5a')}}
+  }
+}
+function drawEvents(){
+  const E=R.ev; if(!E)return;
+  if(E.power>0){ctx.fillStyle='#0008';ctx.fillRect(600,150,400,490);label('⚡ 跳電中 '+Math.ceil(E.power)+' 秒',800,380,'#ffd84a',26,true)}
+  if(E.water>0){for(const k of ['wash','sink']){const s=ST[k];ctx.fillStyle='#2f6fa8cc';rr(s.x-34,s.y-18,68,22,8);ctx.fill();label('🚱 停水 '+Math.ceil(E.water),s.x,s.y-2,'#fff',11,true)}}
+  if(E.broken){const s=ST[E.broken];ctx.fillStyle='#b8352a';rr(s.x-44,s.y-58,88,22,8);ctx.fill();
+    label(E.callT>0?'🔧 師傅 '+Math.ceil(E.callT)+' 秒到':'🔧 故障・站上去修',s.x,s.y-42,'#fff',11,true)}
+  for(const c of R.cust)if(c.inf&&c.st!=='gone'){const t=['order','wait','eat'].includes(c.st)?R.tables[c.table]:c;label('📸 網紅',t.x,t.y-(t===c?40:84),'#c2412d',13,true)}
+}
+// 場間事件
+function staffPick(n){return shuffle(G.staff).slice(0,n)}
+const BETWEEN_EV=[
+ {ok:()=>!evSafe()&&G.staff.length>=2,run(next){const [a,b]=staffPick(2);
+   evBox('😤 員工吵架',`${a.name}和${b.name}為了誰該收桌子吵起來了，兩個人都在等你表態。`,[
+    {t:'站'+a.name+'那邊',f(){a.mood=Math.min(100,a.mood+10);b.mood=Math.max(1,b.mood-15);next()}},
+    {t:'站'+b.name+'那邊',f(){b.mood=Math.min(100,b.mood+10);a.mood=Math.max(1,a.mood-15);next()}},
+    {t:'把兩個人叫來調解',f(){if(Math.random()<.5){a.mood=Math.min(100,a.mood+5);b.mood=Math.min(100,b.mood+5);toast('兩個人握手和好了')}else{a.mood=Math.max(1,a.mood-8);b.mood=Math.max(1,b.mood-8);toast('越吵越兇，兩個都不爽')}next()}}])}},
+ {ok:()=>!evSafe()&&G.staff.some(s=>s.role!=='rest'),run(next){const s=pick(G.staff.filter(x=>x.role!=='rest')),sick=s.stam<45;
+   const rest=()=>{s.backRole=s.role;s.role='rest'};
+   if(sick)return evBox('🤒 病假',`${s.name}累壞了，發燒請病假，這一場不能上班。`,[{t:'好好休息',f(){rest();s.mood=Math.min(100,s.mood+5);next()}}]);
+   evBox('📝 事假',`${s.name}說家裡有事，想請這一場的假。`,[
+    {t:'准假',f(){rest();s.mood=Math.min(100,s.mood+8);next()}},{t:'不准，人手不夠',f(){s.mood=Math.max(1,s.mood-20);next()}}])}},
+ {ok:()=>G.staff.length>0,run(next){const s=pick(G.staff),now=salary(s),up=Math.round(now*1.1);
+   evBox('💰 員工想加薪',`${s.name}：「老闆，我做這麼久了，薪水可以從 ${now} 調到 ${up} 嗎？」`,[
+    {t:'答應加薪 10%',f(){s.raise=(s.raise||1)*1.1;s.mood=Math.min(100,s.mood+20);next()}},{t:'拒絕',f(){s.mood=Math.max(1,s.mood-15);next()}}])}},
+ {ok:()=>!evSafe(),run(next){const dirty=G.lastDirty||0,fail=dirty>6||G.plates<4;
+   if(fail){G.cash-=3000;G.reviews.push(2,2)}else G.reviews.push(4,4);
+   evBox('🧑‍⚕️ 衛生局稽查',fail?`稽查員看到洗碗槽堆了一堆髒盤子，開罰 3,000，還上了地方新聞。`:'稽查員檢查了廚房和碗盤，乾淨合格，還誇了一句。',[{t:'知道了',f:next}])}},
+ {ok:()=>!evSafe(),run(next){const k=pick(Object.keys(ING));G.priceUp={k,until:G.day+6};
+   evBox('📈 食材漲價',`菜市場說${k}最近缺貨，一週內進價貴 50%（${ING[k]} → ${ingP(k)}）。`,[{t:'知道了',f:next}])}},
+ {ok:()=>!evSafe(),run(next){evBox('🌀 颱風天','颱風快到了，路上幾乎沒人。要停業一場，還是硬撐開店（客人只有一半）？',[
+    {t:'硬撐開店',f(){G.mods={cust:{v:.5,left:1}};next()}},
+    {t:'停業這一場',f(){skipMeal('颱風停業')}}])}},
+ {ok:()=>true,run(next){evBox('📺 電視台採訪','美食節目想來拍阿嬤的老店，老闆要親自上鏡講故事。',[
+    {t:'接受採訪',f(){G.mods={cust:{v:1.4,left:2}};G.reviews.push(5,5,5);toast('節目播出後，下兩場客人變多了');next()}},{t:'婉拒',f:next}])}},
+ {ok:()=>!evSafe(),run(next){evBox('🗣 對手散播謠言','對面的連鎖店在網路上說你們用過期肉。',[
+    {t:'花 2,000 發聲明澄清',f(){G.cash-=2000;next()}},{t:'清者自清，不理',f(){G.reviews.push(1,1,1,1);next()}}])}},
+ {ok:()=>G.day>3,run(next){const good=Math.random()<.6;G.mods={cust:{v:good?1.3:.75,left:3}};
+   evBox('🏬 附近開了新商場',good?'商場帶來大量人潮，接下來三場客人變多。':'商場美食街把客人分流走了，接下來三場客人變少。',[{t:'知道了',f:next}])}},
+];
+function betweenEvent(next){
+  if(Math.random()>.4)return next();
+  const c=BETWEEN_EV.filter(e=>e.ok());if(!c.length)return next();
+  pick(c).run(next);
+}
+function skipMeal(title){
+  const res={title,rev:0,comp:0,util:0,sal:0,served:0,angry:0,lost:0,reviews:[],notes:[]};
+  G.staff.forEach(s=>{s.stam=Math.min(100,s.stam+20)});
+  G.meal++; if(G.meal>2){G.meal=0;dayEnd(res,[])}else showBetween(res,false);
 }
 
 /* ---------- 對戰模式 ---------- */
