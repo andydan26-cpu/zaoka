@@ -410,13 +410,14 @@ function grow(p,key,amt=.5){const m=p.mood??70;p.abil[key]=Math.min(100,p.abil[k
 function errChance(p,key,isBoss){let e=Math.max(0,40-p.abil[key])/160;if(!isBoss){if(p.stam<20)e+=.1;if(p.traits.includes('慢慢來'))e*=.3;if(p.traits.includes('天生快手'))e+=.03}return e}
 
 function spotAt(p){for(const k in SPOTS){if(!owned(k))continue;const s=SPOTS[k];if(Math.hypot(p.x-s.x,p.y-s.y)<s.r)return k}return null}
-function bossClaims(){const b=R.boss,set=new Set();if(R.bossSpot)set.add(R.bossSpot);if(b.tx!=null){const d=spotAt({x:b.tx,y:b.ty});if(d)set.add(d)}return set}
-const bossAt=k=>R.bossSpot===k&&!R.boss.carry;
-const curSt=s=>s.role==='prep'?s.rt.pst:STOVES.includes(s.role)?(s.rt.help||s.role):s.role==='clean'?'sink':null;
+function bossClaims(){const b=R.boss,set=new Set();if(R.bossSpot)set.add(R.bossSpot);if(R.boss2){if(R.boss2Spot)set.add(R.boss2Spot);if(R.boss2.tx!=null){const d2=spotAt({x:R.boss2.tx,y:R.boss2.ty});if(d2)set.add(d2)}}if(b.tx!=null){const d=spotAt({x:b.tx,y:b.ty});if(d)set.add(d)}return set}
+const bossAt=k=>(R.bossSpot===k&&!R.boss.carry)||(!!R.boss2&&R.boss2Spot===k&&!R.boss2.carry);
+const curSt=s=>s.rt&&s.rt.cst!==undefined?s.rt.cst:s.role==='prep'?s.rt.pst:STOVES.includes(s.role)?(s.rt.help||s.role):s.role==='clean'?'sink':null;
 function crewOf(k){return G.staff.filter(s=>s.rt&&curSt(s)===k)}
 function stationWorkers(st){
   const out=crewOf(st).filter(s=>s.rt.there&&s.rt.slot>=0&&s.rt.slack<=0&&s.stam>0).map(s=>({p:s,boss:false}));
-  if(bossAt(st))out.unshift({p:G.boss,boss:true});
+  if(R.bossSpot===st&&!R.boss.carry)out.unshift({p:G.boss,boss:true});
+  if(R.boss2&&R.boss2Spot===st&&!R.boss2.carry)out.unshift({p:G.boss2||G.boss,boss:true});
   return out;
 }
 function headTicket(st){return R.tickets.find(t=>t.st==='queued'&&t.steps[t.si]===st)}
@@ -429,11 +430,13 @@ function update(dt){
   while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();if(R.closed)R.skipped=(R.skipped||0)+1;else spawnGroup()}
   // 老闆
   moveBoss(dt);
-  R.bossSpot=spotAt(R.boss); R.claims=bossClaims();
+  moveBoss2(dt);
+  R.bossSpot=spotAt(R.boss); R.boss2Spot=R.boss2?spotAt(R.boss2):null; R.claims=bossClaims();
   if(R.bossSpot==='door'&&R.prevSpot!=='door'&&!(R.ev&&R.ev.power>0)){R.closed=!R.closed;
     fx(SPOTS.door.x+40,SPOTS.door.y-70,R.closed?'暫停收客':'恢復營業',R.closed?'#c2412d':'#3d8b5a');
     toast(R.closed?'門口掛上「暫停收客」，店裡的客人照常服務':'招牌翻回「營業中」，客人又會進來了',2.5)}
   R.prevSpot=R.bossSpot;
+  if(R.boss2){if(R.boss2Spot==='door'&&R.prevSpot2!=='door'&&!(R.ev&&R.ev.power>0)){R.closed=!R.closed;toast((R.boss2.nm||'夥伴')+(R.closed?' 掛上了暫停收客':' 把招牌翻回營業中'),2.5)}R.prevSpot2=R.boss2Spot}
   bossActions(dt);
   // 每個崗位最多 3 人（老闆在的話先佔一位）
   R.plan=prepPlan();
@@ -663,8 +666,9 @@ function moveBoss(dt){
   else if(b.tx!=null){if(walk(b,{x:b.tx,y:b.ty},sp,dt))b.tx=null}
   b.x=clamp(b.x,15,W-15);b.y=clamp(b.y,162,H-15);
 }
-function bossActions(dt){
-  const b=R.boss, B=G.boss, sp=R.bossSpot; b.act=null;
+function bossActions(dt){bossAct(dt,R.boss,R.bossSpot,G.boss);if(R.boss2)bossAct(dt,R.boss2,R.boss2Spot,G.boss2||G.boss)}
+function bossAct(dt,b,sp,B){
+  b.act=null;
   const wf=k=>workerFactor(B,k,true);
   // 出餐台拿菜：老闆優先，員工若還在路上就讓給老闆
   if(!b.carry&&sp==='pass'&&R.pass.length){
@@ -903,11 +907,17 @@ function draw(){
     if(r.carry){ctx.font='14px serif';ctx.fillText(r.carry.basket?'🧺':r.carry.st==='cutCarry'?'🥬':r.carry.dish?DISH_IC[r.carry.dish]:'🍽',r.x+14,r.y-4);if(r.carry.basket)label(r.carry.basket+'×'+r.carry.n,r.x,r.y-46,'#2a2420',10,true)}
     if(r.slot===-1&&!r.carry&&!r.fetch&&!r.goShelf&&(STOVES.includes(s.role)||s.role==='clean'||s.role==='prep'))label('滿了，等位',r.x,r.y-36,'#b8352a',10,true);
   }
+  // 合作夥伴
+  if(R.boss2){const p=R.boss2;ctx.fillStyle='#2f6fa855';ctx.beginPath();ctx.ellipse(p.x,p.y+18,20,8,0,0,7);ctx.fill();
+    if(!spr('chef',p.x,p.y+20,62,false,true))person(p.x,p.y,'#f5d3b3','#2f6fa8',15,true);
+    label(p.nm||'夥伴',p.x,p.y+29,'#2f6fa8',12,true);
+    if(p.carry){ctx.font='16px serif';ctx.fillText(p.carry.basket?'🧺':p.carry.st==='cutCarry'?'🥬':p.carry.dish?DISH_IC[p.carry.dish]:'🍽',p.x+16,p.y-2)}
+    if(p.act){ctx.strokeStyle='#2f6fa8';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.act.x,p.act.y,11,-Math.PI/2,-Math.PI/2+Math.PI*2*(p.actT||0));ctx.stroke()}}
   // 老闆
   const b=R.boss;
   ctx.fillStyle='#c2412d55';ctx.beginPath();ctx.ellipse(b.x,b.y+18,20,8,0,0,7);ctx.fill();
   if(!spr('chef',b.x,b.y+20,62,false,true)){person(b.x,b.y,'#f5d3b3','#c2412d',15,true);ctx.fillStyle='#d9a441';ctx.fillRect(b.x-9,b.y-22,18,5)}
-  label('老闆',b.x,b.y+29,'#c2412d',12,true);
+  label(isGuest()?(COOP.name||'我'):'老闆',b.x,b.y+29,'#c2412d',12,true);
   if(b.carry&&b.carry.basket){ctx.font='16px serif';ctx.fillText('🧺',b.x+16,b.y-2);label(b.carry.basket+'×'+b.carry.n+' →放到備料區',b.x,b.y-50,'#c2412d',11,true)}
   else if(b.carry){const cut=b.carry.st==='cutCarry';ctx.font='16px serif';ctx.fillText(cut?'🥬':b.carry.dish?DISH_IC[b.carry.dish]:'🍽',b.x+16,b.y-2);if(cut)label(DMAP[b.carry.dish].short+'→放到'+ROLES[b.carry.steps[0]],b.x,b.y-50,'#c2412d',11,true);else if(b.carry.dish)label('→'+(b.carry.c.table+1)+'桌',b.x,b.y-50,'#c2412d',11,true)}
   if(b.act){ctx.strokeStyle='#c2412d';ctx.lineWidth=4;ctx.beginPath();ctx.arc(b.act.x,b.act.y,11,-Math.PI/2,-Math.PI/2+Math.PI*2*b.actT);ctx.stroke()}
@@ -1013,6 +1023,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['w','a','s','d','
 addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
 function toLocal(e){const q=elXY(cv,e),z=Z||camera(),sx=q.x,sy=q.y;return{x:(sx-z.ox)/z.s,y:(sy-z.oy)/z.s,hud:z.hud&&sy<z.top}}
 cv.addEventListener('pointerdown',e=>{
+  if(isGuest()){if(!R||$('overlay').style.display!=='none')return;const p=toLocal(e);if(p.hud)return;const k=spotAt(p);const tg=k?{x:SPOTS[k].sx,y:SPOTS[k].sy}:{x:p.x,y:p.y};COOP.seq=(COOP.seq||0)+1;COOP.myT={...tg,at:performance.now()};R.boss.tx=tg.x;R.boss.ty=tg.y;return}
   if(!R||$('overlay').style.display!=='none')return;
   const p=toLocal(e); if(p.hud)return;
   const hit=G.staff.find(s=>s.role!=='rest'&&dist(s.rt,p)<22);
@@ -1061,6 +1072,7 @@ $('bFull').onclick=()=>{
 $('bStaff').onclick=()=>{document.body.classList.toggle('showbar');setTimeout(resize,50)};
 new ResizeObserver(()=>resize()).observe(cv);
 function togglePause(){
+  if(isGuest())return;
   if(!R||$('overlay').style.display!=='none'&&!paused2)return;
   if(paused2){paused2=false;paused=false;hideOverlay();$('bPause').textContent='暫停';return}
   paused=true;paused2=true;$('bPause').textContent='繼續';
@@ -1102,10 +1114,11 @@ function showTitle(){
   <p>你辭掉工作回來接手。阿福師說：「阿嬤的滷肉飯，不能在你手上倒。」</p>
   <p>第一次開店，秀玉姨和阿福師會先帶你走一遍。</p>
   <p class="small">可玩原型：只有阿嬤老店、台式 6 道菜與核心營業循環。數值為暫定。</p>
-  <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
+  <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bCoop">🤝 合作模式</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
   $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
+  $('bCoop').onclick=openCoop;
   if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
@@ -1228,6 +1241,145 @@ function showPrep(){
 
 
 
+
+
+/* ---------- 多人合作（同一家店，兩個老闆） ---------- */
+// 店長（host）跑整個遊戲，每秒約 8 次把畫面狀態放進 presence；夥伴（guest）只負責畫面與自己的走位輸入。
+let COOP=null;
+const isGuest=()=>COOP&&COOP.role==='guest';
+const ING_K=()=>Object.keys(ING), READY_K=['meat_cut','meat_mar','sea_wash','veg_wash','veg_cut','rice_wash','rice_cooked','egg_beat','sauce'];
+function moveBoss2(dt){
+  const b=R.boss2;if(!b)return;const I=b.inp||{};const m=Math.hypot(I.jx||0,I.jy||0),sp=175;
+  if(m>.1){b.tx=null;b.x+=I.jx/Math.max(1,m)*sp*dt;b.y+=I.jy/Math.max(1,m)*sp*dt}
+  else if(b.tx!=null){if(walk(b,{x:b.tx,y:b.ty},sp,dt))b.tx=null}
+  b.x=clamp(b.x,15,W-15);b.y=clamp(b.y,162,H-15);
+}
+const bossOnSpot=k=>R.bossSpot===k?R.boss:(R.boss2&&R.boss2Spot===k?R.boss2:null);
+function carryCode(c){if(!c)return 0;if(c.basket)return ['b',c.basket,c.n];if(c.dirty)return ['d',c.dirty];if(c.st==='cutCarry')return ['c',c.dish];if(c.dish)return ['t',c.dish,c.c?c.c.table:0];return 0}
+function carryDec(a,cm){if(!a)return null;if(a[0]==='b')return {basket:a[1],n:a[2]};if(a[0]==='d')return {dirty:a[1]};
+  if(a[0]==='c')return {st:'cutCarry',dish:a[1],steps:DMAP[a[1]].steps};return {st:'carried',dish:a[1],c:{table:a[2]}}}
+const r0=v=>Math.round(v), r2=v=>Math.round(v*100)/100;
+function encBoss(b){return b?[r0(b.x),r0(b.y),carryCode(b.carry),b.act?r0(b.act.x):0,b.act?r0(b.act.y):0,r2(b.actT||0),b.tx!=null?r0(b.tx):null,b.ty!=null?r0(b.ty):null,b.nm||'老闆']:0}
+function encodeSnap(){
+  const cid=c=>c?c.id:-1;
+  const s={ph:'meal',t:r2(R.t),d:R.dur,cl:R.closed?1:0,wm:R.waitMsg||0,sd:R.sinkDirty,wp:r2(R.washP||0),
+    g:{pl:G.plates,be:ING_K().map(k=>G.bench[k]),sk:ING_K().map(k=>G.stock[k]),rd:READY_K.map(k=>G.ready[k]),ma:[G.mar.length,G.mar.length?r0(Math.min(...G.mar)):0],
+       ck:G.cooker?r0(G.cooker.t):-1,so:G.stoves,sl:G.slots,lv:STOVES.map(k=>G.stoveLv[k]),to:[G.today.served,G.today.rev,G.today.dish],me:G.menu,ca:G.cash,dy:G.day,ml:G.meal,wk:G.week,st:r2(stars())},
+    b:[encBoss(R.boss),encBoss(R.boss2)],
+    f:G.staff.map(s=>[s.id,s.name,s.role,s.rt?r0(s.rt.x):0,s.rt?r0(s.rt.y):0,r0(s.stam),r0(s.mood),s.rt&&s.rt.slack>0?1:0,s.rt?carryCode(s.rt.carry):0,s.rt?curSt(s):null,s.rt&&s.rt.there?1:0,s.rt?s.rt.slot:0]),
+    c:R.cust.filter(c=>c.st!=='gone').slice(0,14).map(c=>[c.id,c.st,r0(c.x),r0(c.y),c.table??-1,c.spr,r2(c.pat/c.patMax),c.party,c.type,c.dishes,c.servedN,c.inf?1:0,r0(c.seatT||0)]),
+    tb:R.tables.map(t=>[t.dirty,cid(t.c)]),
+    k:R.tickets.filter(t=>t.st!=='carried').map(t=>[t.id,t.dish,t.st==='moving'?'queued':t.st,t.si,r2(t.prog||0),cid(t.c),t.stall||0]),
+    ps:PREP.map(k=>{const S=R.ps[k];return [S.job?1:0,r2(S.p||0),S.name||0]}),
+    pa:R.pass.map(t=>t.dish),
+    dg:[r0(R.dog.x),r0(R.dog.y),R.dog.face,R.dog.react?(R.dog.react.like?1:0):-1],
+    fx:R.fx.slice(-8).map(f=>[r0(f.x),r0(f.y),f.txt||0,f.col||0,r2(f.t),f.img||0]),
+    ev:R.ev?{w:r0(R.ev.water),p:R.ev.power?1:0,b:R.ev.broken||0,ct:r0(R.ev.callT||0),r:R.ev.roach?[r0(R.ev.roach.x),r0(R.ev.roach.y)]:0}:0};
+  let js=JSON.stringify(s);
+  while(js.length>3600&&s.fx.length){s.fx.shift();js=JSON.stringify(s)}
+  while(new Blob([js]).size>3900&&s.c.length){s.c.pop();js=JSON.stringify(s)}
+  return s;
+}
+// 夥伴端：把店長傳來的狀態還原成可以畫的 G、R
+function applySnap(s){
+  const prev=COOP.prevPos||{},pos={};
+  const ease=(key,o)=>{const p=prev[key];o._tx=o.x;o._ty=o.y;if(p){o.x=p.x;o.y=p.y}pos[key]=o};
+  const g=s.g;G=G||{};
+  Object.assign(G,{plates:g.pl,bench:Object.fromEntries(ING_K().map((k,i)=>[k,g.be[i]])),stock:Object.fromEntries(ING_K().map((k,i)=>[k,g.sk[i]])),
+    ready:Object.fromEntries(READY_K.map((k,i)=>[k,g.rd[i]])),mar:Array(g.ma[0]).fill(g.ma[1]),cooker:g.ck>=0?{t:g.ck}:null,stoves:g.so,slots:g.sl,
+    stoveLv:Object.fromEntries(STOVES.map((k,i)=>[k,g.lv[i]])),today:{served:g.to[0],rev:g.to[1],dish:g.to[2]},menu:g.me,cash:g.ca,day:g.dy,meal:g.ml,week:g.wk,reviews:[g.st]});
+  const bd=a=>a?{x:a[0],y:a[1],carry:carryDec(a[2]),act:a[3]||a[4]?{x:a[3],y:a[4]}:null,actT:a[5],tx:a[6],ty:a[7],nm:a[8]}:null;
+  // 夥伴看到的「老闆」是自己：交換兩個老闆
+  const me=bd(s.b[1]),host=bd(s.b[0]);
+  if(me){if(COOP.myT&&performance.now()-COOP.myT.at<1500&&me.tx==null){me.tx=COOP.myT.x;me.ty=COOP.myT.y}ease('me',me)}
+  if(host)ease('host',host);
+  const cust=s.c.map(a=>{const c={id:a[0],st:a[1],x:a[2],y:a[3],table:a[4]<0?null:a[4],spr:a[5],pat:a[6],patMax:1,party:a[7],type:a[8],dishes:a[9],servedN:a[10],inf:!!a[11],seatT:a[12]};
+    c.heads=(c.spr||[0]).map(()=>'#f2c9a0');c.col=(CTYPE[c.type]||{}).col||'#888';ease('c'+c.id,c);return c});
+  const cm=Object.fromEntries(cust.map(c=>[c.id,c]));
+  G.staff=s.f.map(a=>{const st={id:a[0],name:a[1],role:a[2],stam:a[5],mood:a[6],traits:[],rt:{x:a[3],y:a[4],slack:a[7],carry:carryDec(a[8]),cst:a[9],there:!!a[10],slot:a[11]}};ease('s'+st.id,st.rt);return st});
+  const dog={x:s.dg[0],y:s.dg[1],face:s.dg[2],react:s.dg[3]>=0?{like:!!s.dg[3],t:1}:null};ease('dog',dog);
+  R={t:s.t,dur:s.d,closed:!!s.cl,waitMsg:s.wm||null,sinkDirty:s.sd,washP:s.wp,cust,boss:me||{x:IDLE.x,y:IDLE.y,carry:null},boss2:host,rev:0,tips:0,battle:null,payQ:[],
+    tables:TABLES.map((t,i)=>({...t,dirty:s.tb[i][0],c:cm[s.tb[i][1]]||null})),
+    tickets:s.k.map(a=>({id:a[0],dish:a[1],st:a[2],si:a[3],prog:a[4],c:cm[a[5]]||null,stall:a[6]||null,steps:DMAP[a[1]].steps})),
+    ps:Object.fromEntries(PREP.map((k,i)=>[k,{job:s.ps[i][0]?{}:null,p:s.ps[i][1],name:s.ps[i][2]||null}])),
+    pass:s.pa.map(d=>({dish:d})),dog,fx:s.fx.map(a=>({x:a[0],y:a[1],txt:a[2]||'',col:a[3]||'#2a2420',t:a[4],img:a[5]||null})),
+    ev:s.ev?{water:s.ev.w,power:s.ev.p,broken:s.ev.b||null,callT:s.ev.ct,roach:s.ev.r?{x:s.ev.r[0],y:s.ev.r[1]}:null}:null,claims:new Set()};
+  if(s.ev&&s.ev.r)SPOTS.roach={x:s.ev.r[0],y:s.ev.r[1],r:26,sx:s.ev.r[0],sy:s.ev.r[1]+4};else delete SPOTS.roach;
+  R.bossSpot=spotAt(R.boss);R.boss2Spot=host?spotAt(host):null;
+  COOP.ents=pos;COOP.prevPos=Object.fromEntries(Object.entries(pos).map(([k,o])=>[k,{x:o._tx,y:o._ty}]));
+}
+function coopGuestFrame(dt){
+  const nr=COOP.nr;if(!nr)return;
+  const host=nr.peers().find(p=>!p.sameTab&&p.presence&&p.presence.role==='host');
+  if(!host){coopWait('店長離開了或還沒連上…');return}
+  const s=host.presence.s, ph=host.presence.ph;
+  if(ph!=='meal'||!s){coopWait(host.presence.msg||'店長正在準備下一場…');}
+  else{if(COOP.waiting){COOP.waiting=false;hideOverlay()}
+    if(s!==COOP.lastS){COOP.lastS=s;applySnap(s)}}
+  // 平滑移動
+  if(COOP.ents)for(const k in COOP.ents){const o=COOP.ents[k],f=Math.min(1,dt*12);o.x+=(o._tx-o.x)*f;o.y+=(o._ty-o.y)*f}
+  // 送出自己的輸入
+  let vx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joyV.x, vy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+joyV.y;
+  const inp={jx:r2(vx),jy:r2(vy),tx:COOP.myT?r0(COOP.myT.x):null,ty:COOP.myT?r0(COOP.myT.y):null,q:COOP.seq||0};
+  const js=JSON.stringify(inp);COOP.sendT=(COOP.sendT||0)+dt;
+  if(js!==COOP.lastIn&&COOP.sendT>.06){COOP.sendT=0;COOP.lastIn=js;nr.presence({in:inp}).catch(()=>{})}
+}
+function coopWait(msg){
+  if(COOP.waiting===msg)return;COOP.waiting=msg;
+  showOverlay(`<h1>🤝 合作模式</h1><p>你是 <b>${esc(COOP.name)}</b>，在房間 <b>${COOP.code}</b>。</p><p style="font-size:18px">⏳ ${esc(msg)}</p><p class="small">店長開始營業後，畫面會自動切過來。你只要控制自己（藍色光圈的老闆）：走位、點圈圈做事，跟店長一起顧店。</p><div class="foot"><button class="btn ghost" id="bCoopLeave">離開合作</button></div>`);
+  $('bCoopLeave').onclick=leaveCoop;
+}
+function coopHostTick(dt){
+  const nr=COOP.nr;if(!nr)return;
+  const guest=nr.peers().find(p=>!p.sameTab&&p.presence&&p.presence.role==='guest');
+  COOP.guestName=guest?String(guest.presence.nm||'夥伴').slice(0,10):null;
+  if(R&&!R.battle){
+    if(guest&&!R.boss2){R.boss2={x:IDLE.x-40,y:IDLE.y+30,carry:null,act:null,actT:0,tx:null,ty:null,nm:COOP.guestName};toast('🤝 '+COOP.guestName+' 進店幫忙了！')}
+    if(!guest&&R.boss2){if(R.boss2.carry&&R.boss2.carry.basket)G.bench[R.boss2.carry.basket]+=R.boss2.carry.n;R.boss2=null;toast('夥伴離開了')}
+    if(guest&&R.boss2){const I=guest.presence.in||{};R.boss2.inp=I;R.boss2.nm=COOP.guestName;
+      if(I.q&&I.q!==R.boss2.q){R.boss2.q=I.q;if(I.tx!=null){R.boss2.tx=I.tx;R.boss2.ty=I.ty}}}
+  }
+  COOP.t=(COOP.t||0)+dt;if(COOP.t<.12)return;COOP.t=0;
+  const live=R&&!paused&&$('overlay').style.display==='none';
+  const msg=!R?'店長正在準備…':$('overlay').style.display!=='none'?(($('panel').querySelector('h1')||{}).textContent||'店長正在準備…'):'暫停中';
+  try{nr.presence(live?{role:'host',nm:COOP.name,ph:'meal',s:encodeSnap(),msg:null}:{role:'host',nm:COOP.name,ph:'wait',msg:String(msg).slice(0,60),s:null}).catch(()=>{})}catch(e){}
+}
+async function openCoop(){
+  showOverlay(`<h1>🤝 合作模式</h1><p>連線中…</p>`);
+  const room=await getRoom();
+  if(!room){showOverlay(`<h1>🤝 合作模式</h1><p>這個畫面連不上合作房間。</p><p class="small">合作模式只能在 Claude 上的分享連結玩，兩個人都要登入 Claude。GitHub 全螢幕版不支援。</p><div class="foot"><button class="btn" id="bBk">回開店畫面</button></div>`);$('bBk').onclick=showTitle;return}
+  const name=lsGet('zaoka_name')||('老闆'+ri(10,99));
+  showOverlay(`<h1>🤝 合作模式</h1><p>兩個人顧同一家店：店長負責排班、進貨、決定事情；夥伴跟店長一起在店裡跑。兩個老闆都可以點餐、做菜、端菜、收碗、結帳。</p>
+   <div class="box row" style="margin:8px 0"><span>你的暱稱</span><input id="cpName" value="${esc(name)}" maxlength="10" style="font-size:15px;padding:6px;border-radius:6px;border:1px solid var(--line);flex:1;margin-left:8px"></div>
+   <div class="grid"><div class="box"><b>我當店長（開房）</b><p class="small">用你目前的存檔開店，產生房號給朋友。</p><button class="btn" id="cpHost">開房</button></div>
+   <div class="box"><b>我當夥伴（加入）</b><p class="small">輸入朋友給的 4 碼房號。</p><input id="cpCode" maxlength="4" placeholder="房號" style="font-size:18px;width:100px;padding:6px;text-transform:uppercase;border-radius:6px;border:1px solid var(--line)"> <button class="btn" id="cpJoin">加入</button></div></div>
+   <div class="foot"><button class="btn ghost" id="bBk">返回</button></div>`);
+  $('bBk').onclick=showTitle;
+  const nm=()=>{const v=($('cpName').value||'').trim().slice(0,10)||name;lsSet('zaoka_name',v);return v};
+  $('cpHost').onclick=async()=>{const code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[ri(0,31)]).join('');const n=nm();
+    try{const nr=await room.join('zc-'+code.toLowerCase());COOP={role:'host',nr,code,name:n};nr.presence({role:'host',nm:n,ph:'wait',msg:'店長正在準備…'}).catch(()=>{});coopHostLobby()}
+    catch(e){toast('開房失敗，請再試一次')}};
+  $('cpJoin').onclick=async()=>{const code=($('cpCode').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==4)return toast('房號是 4 碼');const n=nm();
+    try{const nr=await room.join('zc-'+code.toLowerCase());COOP={role:'guest',nr,code,name:n,seq:0};R=null;paused=true;
+      nr.presence({role:'guest',nm:n}).catch(()=>{});coopWait('等店長開店…')}
+    catch(e){toast('加入失敗，請確認房號')}};
+}
+function coopHostLobby(){
+  const draw=()=>{if(!COOP||COOP.role!=='host')return;const g=COOP.nr.peers().find(p=>!p.sameTab&&p.presence&&p.presence.role==='guest');
+    showOverlay(`<h1>🤝 合作模式・店長</h1><p>把房號告訴朋友：</p><div style="font-size:44px;font-family:var(--f-display);letter-spacing:.2em;color:var(--red);text-align:center">${COOP.code}</div>
+     <p style="text-align:center">${g?'✅ '+esc(String(g.presence.nm||'夥伴'))+' 已加入':'⏳ 等朋友加入…（他要打開同一個連結、按「合作模式」→ 加入）'}</p>
+     <p class="small">用你目前的存檔開店。合作中只有你能排班、進貨、處理事件；夥伴在店裡跟你一起跑。</p>
+     <div class="foot"><button class="btn ghost" id="bCoopLeave">取消</button><button class="btn" id="cpGo">${g?'開始合作':'先自己開店'}</button></div>`);
+    $('bCoopLeave').onclick=leaveCoop;$('cpGo').onclick=()=>{clearInterval(COOP.lobbyT);let has=false;try{has=!!localStorage.getItem('zaoka')}catch(e){}
+      if(has){try{G=JSON.parse(localStorage.getItem('zaoka'))}catch(e){}}G.tutorial=false;G.prepIntro=true;G.boss2={name:'夥伴',abil:{...G.boss.abil}};showPrep()}};
+  draw();COOP.lobbyT=setInterval(()=>{if($('cpGo'))draw();else clearInterval(COOP.lobbyT)},1500);
+}
+function leaveCoop(){
+  if(COOP){try{clearInterval(COOP.lobbyT);COOP.nr&&COOP.nr.leave()}catch(e){}}
+  const wasGuest=isGuest();COOP=null;
+  if(wasGuest){R=null;delete SPOTS.roach;newGame()}
+  showTitle();
+}
 
 /* ---------- 研發新菜 ---------- */
 const BASE_DISH=['lurou','egg','oyster','migao','yansu','paigu'];
@@ -1448,16 +1600,16 @@ function mealEvTick(dt){
   const E=R.ev; if(!E)return;
   if(E.at!=null&&R.t>=E.at&&!R.battle){E.at=null;const c=MEAL_EV.filter(e=>e.ok());if(c.length)pick(c).run()}
   E.water=Math.max(0,E.water-dt);
-  if(E.power>0&&R.bossSpot==='door'){E.pfix+=dt/2;R.boss.act={x:SPOTS.door.x,y:SPOTS.door.y-62};R.boss.actT=E.pfix;
+  if(E.power>0&&bossOnSpot('door')){const bb=bossOnSpot('door');E.pfix+=dt/2;bb.act={x:SPOTS.door.x,y:SPOTS.door.y-62};bb.actT=E.pfix;
     if(E.pfix>=1){E.power=0;toast('電箱開關扳回來，恢復供電！');fx(R.boss.x,R.boss.y-50,'💡 來電了','#3f8f5a')}}
   if(E.roach){const r=E.roach;r.t+=dt;
-    if(R.bossSpot==='roach'){r.p+=dt/3;R.boss.act={x:SPOTS.roach.x,y:SPOTS.roach.y-50};R.boss.actT=r.p;
+    if(bossOnSpot('roach')){const bb=bossOnSpot('roach');r.p+=dt/3;bb.act={x:SPOTS.roach.x,y:SPOTS.roach.y-50};bb.actT=r.p;
       if(r.p>=1){E.roach=null;delete SPOTS.roach;toast('蟑螂解決了！');fx(R.boss.x,R.boss.y-50,'✔ 除蟲完成','#3f8f5a')}}
     else if(r.t>=r.next){r.next+=12;R.cust.forEach(c=>{if(['queue','order','wait'].includes(c.st))c.pat=Math.max(1,c.pat-c.patMax*.12)});
       addReview(1,2,'店裡有蟑螂');fx(r.x,r.y-30,'客人看到蟑螂了！','#b8352a')}}
   if(E.broken){
     if(E.callT>0){E.callT-=dt;if(E.callT<=0){toast('師傅修好了');E.broken=null}}
-    else if(R.bossSpot===E.broken){E.fixP+=dt/6;R.boss.act={x:ST[E.broken].x,y:ST[E.broken].y-62};R.boss.actT=E.fixP;
+    else if(bossOnSpot(E.broken)){const bb=bossOnSpot(E.broken);E.fixP+=dt/6;bb.act={x:ST[E.broken].x,y:ST[E.broken].y-62};bb.actT=E.fixP;
       if(E.fixP>=1){grow(G.boss,E.broken,1);E.broken=null;toast('老闆自己修好了！');fx(R.boss.x,R.boss.y-50,'🔧 修好了','#3f8f5a')}}
   }
 }
@@ -1733,6 +1885,8 @@ function battleQuit(){paused2=false;$('bPause').textContent='暫停';restoreMain
 /* ---------- 主迴圈 ---------- */
 function loop(ts){
   const dt=Math.min(.05,(ts-lastT)/1000||0);lastT=ts;
+  if(isGuest()){coopGuestFrame(dt);if(R)draw();else drawIdle();if(R)hud();requestAnimationFrame(loop);return}
+  if(COOP&&COOP.role==='host')coopHostTick(dt);
   if(R&&!paused)update(dt);
   if(R)draw(); else drawIdle();
   hud();
