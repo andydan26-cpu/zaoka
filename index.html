@@ -181,7 +181,7 @@ const artOk=k=>ART[k]&&ART[k].complete&&ART[k].naturalWidth>0;
 function spr(k,cx,cy,h,flip=false,bottom=false){if(!artOk(k))return false;const im=ART[k],w=h*im.naturalWidth/im.naturalHeight,y=bottom?cy-h:cy-h/2;
   if(flip){ctx.save();ctx.translate(cx,0);ctx.scale(-1,1);ctx.drawImage(im,-w/2,y,w,h);ctx.restore()}else ctx.drawImage(im,cx-w/2,y,w,h);return true}
 let PAT={};const pat=k=>{if(!PAT[k]&&artOk(k))PAT[k]=ctx.createPattern(ART[k],'repeat');return PAT[k]};
-const DISH_IC={lurou:'🍛',egg:'🍳',oyster:'🥘',migao:'🍙',yansu:'🍗',paigu:'🍱'};
+const DISH_IC={lurou:'🍛',egg:'🍳',oyster:'🥘',migao:'🍙',yansu:'🍗',paigu:'🍱',tang:'🥬',mianxian:'🍜',zong:'🫔',sanbei:'🍗',niurou:'🍜',guabao:'🥪'};
 const STOVES=['boil','wok','steam','fry'], PREP=['wash','cut','beat','rice','mar'];
 const STOVE_FULL={boil:'煮鍋爐',wok:'炒鍋爐',steam:'蒸籠爐',fry:'炸鍋'};
 const owned=k=>!STOVES.includes(k)||(G&&G.stoves.includes(k));
@@ -196,6 +196,13 @@ const DISHES=[
   {id:'migao',name:'筒仔米糕',short:'米糕',steps:['steam'],req:['meat_cut','rice_wash','sauce'],ref:70},
   {id:'yansu',name:'鹽酥雞',short:'鹽酥',steps:['fry'],req:['meat_mar','sauce'],ref:85},
   {id:'paigu',name:'排骨便當',short:'排骨',steps:['steam','fry','wok'],req:['meat_mar','rice_cooked','veg_cut'],ref:130},
+  // 研發候選（研發成功才會出現在菜單）
+  {id:'tang',name:'燙青菜',short:'燙菜',steps:['boil'],req:['veg_wash','sauce'],ref:40,clue:'青菜洗乾淨丟進滾水燙熟，起鍋淋一匙醬汁。'},
+  {id:'mianxian',name:'蚵仔麵線',short:'麵線',steps:['boil'],req:['sea_wash','sauce'],ref:60,clue:'蚵仔洗乾淨，加進勾芡的湯頭裡，調味煮滾。'},
+  {id:'zong',name:'肉粽',short:'肉粽',steps:['steam'],req:['meat_cut','rice_wash','sauce'],ref:65,clue:'生米洗過泡水，包進切好的五花肉跟醬汁，下去蒸。'},
+  {id:'sanbei',name:'三杯雞',short:'三杯',steps:['wok'],req:['meat_cut','veg_cut','sauce'],ref:110,clue:'雞肉切塊，九層塔切好，加三杯醬大火快炒。'},
+  {id:'niurou',name:'紅燒牛肉麵',short:'牛肉麵',steps:['boil'],req:['meat_cut','veg_cut','sauce','rice_cooked'],ref:140,clue:'牛肉切塊、青菜切段，用醬汁燉到軟爛，麵條（米麵類，先煮熟）另外下。'},
+  {id:'guabao',name:'刈包',short:'刈包',steps:['steam','wok'],req:['meat_cut','veg_cut','sauce'],ref:70,clue:'五花肉切片滷入味，夾酸菜（切好的菜），先蒸軟刈包再回鍋。'},
 ];
 DISHES.forEach(d=>d.ing=[...new Set(d.req.map(k=>ITEM[k].raw))]);
 const dishOk=d=>d.steps.every(owned);
@@ -234,7 +241,7 @@ function newGame(){
      bench:{'肉':3,'海鮮':2,'蔬菜':3,'米麵':10,'蛋奶':3,'調味':5},
      stock:{'肉':20,'海鮮':12,'蔬菜':20,'米麵':30,'蛋奶':20,'調味':30},
      prices:Object.fromEntries(DISHES.map(d=>[d.id,d.ref])),
-     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false, rel:{'1-2':50},
+     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false, rel:{'1-2':50}, known:BASE_DISH.slice(), dishQ:{},
      boss:{name:'老闆',abil:abil({prep:35,order:30,serve:30,bus:30,cash:30,deliv:20,steam:25,boil:25,fry:25,wok:25,clean:30,buy:30})},
      staff:[
       {id:1,name:'阿福師',title:'老師傅',traits:['勤勞','慢慢來'],mood:70,stam:90,role:'wok',
@@ -357,7 +364,7 @@ function chooseDishes(c){
   if(c.forceDish)return c.forceDish.slice();
   const ct=CTYPE[c.type], out=[], tmp=availIng();
   for(let i=0;i<c.party;i++){
-    const opts=DISHES.filter(d=>G.menu.includes(d.id)&&dishOk(d)&&d.ing.every(k=>tmp[k]>0));
+    const opts=DISHES.filter(d=>G.menu.includes(d.id)&&dishOk(d)&&known(d.id)&&d.ing.every(k=>tmp[k]>0));
     if(!opts.length)break;
     const ws=opts.map(d=>{const r=G.prices[d.id]/d.ref;let w=Math.exp(-(r-1)*ct.sens*2.5);
       if(c.type==='office'&&d.steps.length===1)w*=1.5; if(c.type==='family'&&d.steps.length>1)w*=1.4; if(r>1.8&&c.type!=='foodie')w*=.1; return w;});
@@ -603,7 +610,7 @@ function settlePay(c,opt){
   c.st='leave';
 }
 function deliver(t){
-  const c=t.c; c.servedN++; c.qs=(c.qs||[]); c.qs.push(t.q.reduce((a,b)=>a+b,0)/t.q.length);
+  const c=t.c; c.servedN++; c.qs=(c.qs||[]); c.qs.push(t.q.reduce((a,b)=>a+b,0)/t.q.length+((G.dishQ||{})[t.dish]||0));
   R.tickets=R.tickets.filter(x=>x!==t);
   if(c.servedN>=c.dishes.length){c.st='eat';c.eatT=rnd(7,10);c.patLeft=c.pat/c.patMax}
 }
@@ -1099,7 +1106,7 @@ function showTitle(){
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
   $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
-  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.rel)G.rel={'1-2':50};if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
+  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
 
@@ -1130,7 +1137,7 @@ const capOk=c=>{if(G.cash-c<opCap()){toast('花了會低於營業本金 '+fmt(op
 function showPrep(){
   paused=true;selected=null;
   const day=G.meal===0;
-  G.menu=G.menu.filter(id=>dishOk(DMAP[id]));if(!G.menu.length)G.menu=['egg'];
+  G.menu=G.menu.filter(id=>dishOk(DMAP[id])&&known(id));if(!G.menu.length)G.menu=['egg'];
   const sel=s=>`<select id="role${s.id}" data-id="${s.id}">${Object.entries(ROLES).filter(([k])=>owned(k)).map(([k,v])=>`<option value="${k}"${s.role===k?' selected':''}>${v}</option>`).join('')}</select>`;
   const staffBox=s=>{const tops=Object.entries(s.abil).sort((a,b)=>b[1]-a[1]).slice(0,4);
     return `<div class="box"><div class="row"><b>${s.name}</b><span class="small">${s.title}</span></div>
@@ -1169,13 +1176,14 @@ function showPrep(){
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    ${intro}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
-   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.map(priceRow).join('')}</div>`;
+   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.filter(d=>known(d.id)).map(priceRow).join('')}</div>`;
   if(day){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
       return `<div class="box"><div class="row"><b>${c.name}</b><span class="tag">${c.title}</span></div><div class="small">${c.traits.join('、')}</div>
       <div class="small">擅長（約）${tops.map(([k,v])=>AB[k]+' '+(Math.round(v/10)*10)).join('・')}</div><div class="small">薪水 ${salary(c)}/餐期</div>
       <button class="btn sm" data-hire="${c.id}" ${G.staff.length>=6?'disabled':''}>聘用 ${fmt(cost)}</button></div>`}).join('')}</div>
       <p class="small">4 桌店面最多 6 位員工。</p>
+      ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
       <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><button class="btn sm ghost" data-pay="max">能還的全還</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*.005)}</span></div>
@@ -1185,6 +1193,7 @@ function showPrep(){
   showOverlay(h,'prep');
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
+  P.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>startRD(b.dataset.rd,($('rdChef')||{}).value));
   P.querySelectorAll('[data-dinner]').forEach(b=>b.onclick=()=>{const cost=300*(G.staff.length+1);if(G.cash<cost)return toast('現金不夠');G.cash-=cost;G.dinnerDay=G.day;
     G.staff.forEach(s=>s.mood=Math.min(100,s.mood+15));G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>relAdd(a,b,15)));toast('大家吃得很開心！');showPrep()});
   P.querySelectorAll('[data-plate]').forEach(b=>b.onclick=()=>{const n=+b.dataset.plate,c=n*80;if(G.cash<c)return toast('現金不夠');G.cash-=c;G.plates+=n;G.platesLost=Math.max(0,(G.platesLost||0)-n);showPrep()});
@@ -1218,6 +1227,74 @@ function showPrep(){
 
 
 
+
+
+/* ---------- 研發新菜 ---------- */
+const BASE_DISH=['lurou','egg','oyster','migao','yansu','paigu'];
+const known=id=>(G.known||BASE_DISH).includes(id);
+const rdCost=d=>d.ing.reduce((a,k)=>a+ING[k],0)*10;
+const RD_MODE={wok:{n:'炒',act:'翻鍋！',tip:'鍋氣要夠：指針跑到綠色區就按「翻鍋」。指針跑很快！',sp:1.9,w:.18},
+  fry:{n:'炸',act:'起鍋！',tip:'抓油炸時機：綠色區很窄，太早不熟、太晚焦掉。',sp:1.2,w:.11},
+  boil:{n:'煮',act:'轉小火！',tip:'控火：滾起來進到綠色區時轉小火。',sp:.9,w:.2},
+  steam:{n:'蒸',act:'掀蓋！',tip:'控火：蒸氣冒到綠色區時掀蓋。',sp:.8,w:.2}};
+let RD=null;
+function rdHtml(){
+  const done=G.rdDay===G.day, cands=DISHES.filter(d=>!known(d.id)), redo=DISHES.filter(d=>known(d.id));
+  const box=(d,again)=>{const q=(G.dishQ||{})[d.id];return `<div class="box"><div class="row"><b>${DISH_IC[d.id]||'🍽'} ${d.name}</b><span class="small">${d.steps.map(s=>ROLES[s]).join('→')}</span></div>
+    <div class="small">${again?`目前品質加成 ${q?(q>0?'+':'')+q:'0'}`:'參考售價 $'+d.ref}｜試做材料 ${fmt(rdCost(d))}${dishOk(d)?'':'<br><span class="neg">研發成功後，要有'+d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]).join('、')+'才能賣</span>'}</div>
+    <button class="btn sm${again?' ghost':''}" data-rd="${d.id}" ${done?'disabled':''} style="margin-top:4px">${again?'重新研發':'開始研發'}</button></div>`};
+  const sel=`<select id="rdChef"><option value="">老闆自己來</option>${G.staff.map(s=>`<option value="${s.id}">帶 ${s.name}</option>`).join('')}</select>`;
+  return `<h2>研發新菜</h2><p class="small">三關：配方猜謎 → 火候節奏 → 評審試吃，平均 60 分以上就學會。分數越高，這道菜品質越好；學會的菜也可以重新研發刷分。失敗材料錢就沒了，一天只能試一次。${done?'<b class="neg">今天已經研發過了。</b>':''}</p>
+   <div class="row" style="justify-content:flex-start;gap:8px;margin-bottom:6px"><span class="small">研發夥伴</span>${sel}<span class="small">（夥伴這道菜的爐具能力越高，評審分數越高）</span></div>
+   <div class="grid">${cands.map(d=>box(d,false)).join('')}</div>
+   <details style="margin-top:6px"><summary class="small">重新研發已會的菜（刷品質）</summary><div class="grid" style="margin-top:6px">${redo.map(d=>box(d,true)).join('')}</div></details>`;
+}
+function startRD(id,chefId){
+  const d=DMAP[id],c=rdCost(d);if(G.cash<c)return toast('現金不夠買試做材料');
+  G.cash-=c;G.rdDay=G.day;
+  RD={d,chef:G.staff.find(s=>s.id==chefId)||null,pick:new Set(),s1:0,s2:[],tries:0};rdStage1();
+}
+function rdHead(n){const d=RD.d;return `<h1>研發：${d.name}</h1><p class="small">第 ${n} 關／共 3 關　研發夥伴：老闆${RD.chef?'＋'+RD.chef.name:''}</p>`}
+function rdStage1(){
+  const d=RD.d,items=Object.keys(ITEM);
+  showOverlay(rdHead(1)+`<h2>配方猜謎</h2><div class="box" style="font-size:15px">📜 阿嬤的筆記：「${d.clue}」</div>
+   <p>從下面選出這道菜要的 <b>${d.req.length}</b> 樣備料：</p>
+   <div style="display:flex;flex-wrap:wrap;gap:8px">${items.map(k=>`<button class="btn ${RD.pick.has(k)?'':'ghost'}" data-it="${k}">${ITEM[k].n}</button>`).join('')}</div>
+   <div class="foot"><button class="btn" id="rdOk" ${RD.pick.size!==d.req.length?'disabled':''}>就是這些！</button></div>`);
+  $('panel').querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{const k=b.dataset.it;if(RD.pick.has(k))RD.pick.delete(k);else if(RD.pick.size<d.req.length)RD.pick.add(k);rdStage1()});
+  $('rdOk').onclick=()=>{const ok=[...RD.pick].filter(k=>d.req.includes(k)).length;RD.s1=Math.round(ok/d.req.length*100);
+    showOverlay(rdHead(1)+`<h2>配方猜謎</h2><p style="font-size:18px">${ok===d.req.length?'✅ 全對！':'答對 '+ok+'／'+d.req.length+' 樣'}</p><p>正確配方：${d.req.map(k=>ITEM[k].n).join('、')}</p><p>得分 <b>${RD.s1}</b></p><div class="foot"><button class="btn" id="rdNext">下一關：火候</button></div>`);
+    $('rdNext').onclick=rdStage2};
+}
+function rdStage2(){
+  const m=RD_MODE[RD.d.steps[0]],zc=.25+Math.random()*.5;
+  showOverlay(rdHead(2)+`<h2>火候節奏（${m.n}）</h2><p>${m.tip}共 3 次。</p>
+   <div id="rdBar" style="position:relative;height:46px;border-radius:10px;background:linear-gradient(90deg,#3c5c53,#d9a441 60%,#c2412d);overflow:hidden;margin:14px 0">
+    <div style="position:absolute;top:0;bottom:0;left:${(zc-m.w/2)*100}%;width:${m.w*100}%;background:#3f8f5acc;border:2px solid #fff;box-sizing:border-box"></div>
+    <div id="rdNeedle" style="position:absolute;top:-4px;bottom:-4px;width:6px;background:#fff;box-shadow:0 0 6px #000;left:0"></div></div>
+   <p class="small" id="rdRes">${RD.s2.map((v,i)=>'第 '+(i+1)+' 次 '+v+' 分').join('　')}</p>
+   <div class="foot"><button class="btn" id="rdHit" style="font-size:20px;padding:12px 28px">${m.act}</button></div>`);
+  let t0=performance.now(),x=0,live=true;
+  const tick=()=>{if(!live||!$('rdNeedle'))return;const t=(performance.now()-t0)/1000*m.sp;x=1-Math.abs((t%2)-1);$('rdNeedle').style.left=`calc(${x*100}% - 3px)`;requestAnimationFrame(tick)};tick();
+  $('rdHit').onclick=()=>{live=false;const off=Math.abs(x-zc),v=off<=m.w/2?Math.round(100-off/(m.w/2)*25):Math.max(0,Math.round(70-(off-m.w/2)*300));
+    RD.s2.push(v);if(RD.s2.length<3)return setTimeout(rdStage2,500);
+    const avg=Math.round(RD.s2.reduce((a,b)=>a+b,0)/3);RD.s2v=avg;
+    showOverlay(rdHead(2)+`<h2>火候節奏</h2><p>${RD.s2.map((v,i)=>'第 '+(i+1)+' 次 '+v+' 分').join('　')}</p><p>平均 <b>${avg}</b></p><div class="foot"><button class="btn" id="rdNext">下一關：評審試吃</button></div>`);
+    $('rdNext').onclick=rdStage3};
+}
+function rdStage3(){
+  const d=RD.d,st=d.steps[0],ab=Math.max(G.boss.abil[st],RD.chef?RD.chef.abil[st]:0),base=RD.s1*.4+RD.s2v*.4+ab*.2+(RD.chef&&relOf?0:0);
+  const J=[['上班族','👔',0,['份量夠，CP 值高','趕時間吃剛好','普通，吃得飽']],['家庭客','👨‍👩‍👧',4,['小孩很愛','有媽媽的味道','長輩說太鹹']],['美食家','🧐',-8,['層次很好','火候差了一點','這道可以當招牌']]];
+  const sc=J.map(([n,ic,b,cm])=>{const v=clamp(Math.round(base+b+rnd(-6,6)),0,100);return {n,ic,v,c:v>=75?cm[0]:v>=60?cm[1]:cm[2]}});
+  const avg=Math.round(sc.reduce((a,s)=>a+s.v,0)/3),pass=avg>=60,q=clamp(Math.round((avg-60)/40*15),-5,15);
+  G.dishQ=G.dishQ||{};const was=known(d.id);
+  if(pass){if(!was){G.known=[...(G.known||BASE_DISH),d.id];G.prices[d.id]=G.prices[d.id]||d.ref}G.dishQ[d.id]=Math.max(G.dishQ[d.id]??-99,q)}
+  [G.boss,RD.chef].filter(Boolean).forEach(p=>grow(p,st,2));if(RD.chef)RD.chef.mood=Math.min(100,RD.chef.mood+(pass?10:-5));
+  showOverlay(rdHead(3)+`<h2>評審試吃</h2><div class="grid">${sc.map(s=>`<div class="box" style="text-align:center"><div style="font-size:34px">${s.ic}</div><b>${s.n}</b><div style="font-size:26px;font-family:var(--f-display)">${s.v}</div><div class="small">「${s.c}」</div></div>`).join('')}</div>
+   <p style="font-size:18px;margin-top:10px">平均 <b>${avg}</b> 分　${pass?(was?'✅ 重新研發完成，品質加成 '+(G.dishQ[d.id]>0?'+':'')+G.dishQ[d.id]:'🎉 學會了「'+d.name+'」！品質加成 '+(q>0?'+':'')+q+'，可以加進菜單了'):'❌ 還差一點，材料費就當學費了。明天再試'}</p>
+   <div class="foot"><button class="btn" id="rdBack">回到準備畫面</button></div>`);
+  $('rdBack').onclick=()=>{RD=null;save();showPrep()};
+}
 
 /* ---------- 員工關係與連攜技 ---------- */
 const rk=(a,b)=>a.id<b.id?a.id+'-'+b.id:b.id+'-'+a.id;
