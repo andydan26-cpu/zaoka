@@ -75,6 +75,15 @@ select{font-family:var(--f-body);font-size:13px;padding:3px;border-radius:6px;bo
 .tag{display:inline-block;font-size:11px;background:var(--wall);color:var(--paper);padding:1px 6px;border-radius:4px;margin:1px}
 .small{font-size:12px;color:var(--ink-soft)}
 .foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:14px;position:sticky;bottom:-18px;background:var(--paper);padding:10px 0}
+#tut{position:absolute;left:50%;transform:translateX(-50%);top:8px;pointer-events:none;width:min(620px,calc(100% - 24px));display:none;gap:10px;align-items:flex-end;z-index:6;
+  background:#f3ead8;color:#2a2420;border:3px solid #c2412d;border-radius:14px;padding:8px 12px 10px 8px;box-shadow:0 6px 20px #0006;box-sizing:border-box}
+#tut img{width:64px;height:auto;flex:0 0 auto}
+#tut .tx{flex:1;min-width:0}
+#tut b{color:#c2412d;font-size:15px}
+#tut p{margin:2px 0 6px;font-size:14px;line-height:1.55}
+#tut button{pointer-events:auto}
+#tut .tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media (max-height:560px),(max-width:820px){#tut{top:4px;padding:5px 8px;gap:6px}#tut img{width:40px}#tut p{font-size:12px;line-height:1.4;margin:1px 0 4px}#tut b{font-size:12px}}
 #toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 14px;border-radius:999px;font-size:13px;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
 #joy{position:absolute;left:12px;bottom:12px;width:110px;height:110px;border-radius:50%;background:#fff2;border:2px solid #fff5;display:none;touch-action:none}
 #joy i{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff9}
@@ -142,6 +151,7 @@ body.rot90{padding:0}
     <canvas id="cv" aria-label="餐廳營業畫面"></canvas>
     <div id="joy"><i></i></div>
     <div id="toast"></div>
+    <div id="tut"></div>
   </div></div>
   <div id="bar"></div>
 </div>
@@ -343,6 +353,7 @@ function stockAI(s,dt){
   return false;
 }
 function chooseDishes(c){
+  if(c.forceDish)return c.forceDish.slice();
   const ct=CTYPE[c.type], out=[], tmp=availIng();
   for(let i=0;i<c.party;i++){
     const opts=DISHES.filter(d=>G.menu.includes(d.id)&&dishOk(d)&&d.ing.every(k=>tmp[k]>0));
@@ -403,9 +414,9 @@ function stationWorkers(st){
 function headTicket(st){return R.tickets.find(t=>t.st==='queued'&&t.steps[t.si]===st)}
 
 function update(dt){
-  R.t+=dt;
+  R.t+=TUT?0:dt;
   if(R.battle)battleTick(dt);
-  mealEvTick(dt);
+  mealEvTick(dt); tutTick();
   const PWR=(R.battle&&R.battle.deb.power>0)||R.ev.power>0, WTR=(R.battle&&R.battle.deb.water>0)||R.ev.water>0;
   while(R.spawns.length&&R.spawns[0]<=R.t){R.spawns.shift();if(R.closed)R.skipped=(R.skipped||0)+1;else spawnGroup()}
   // 老闆
@@ -429,7 +440,7 @@ function update(dt){
     list.forEach((s,i)=>{s.rt.slot=i<cap?i:-1;s.rt.wait=i-cap})}
   // 員工
   for(const s of G.staff){
-    const rt=s.rt; if(s.role==='rest')continue;
+    const rt=s.rt; if(s.role==='rest'||TUT)continue;
     s.stam=Math.max(0,s.stam-dt*(s.traits.includes('勤勞')?.075:s.traits.includes('愛偷懶')?.06:.1));
     if(s.stam<=0){rt.slack=1;continue}
     if(rt.slack>0){rt.slack-=dt;continue}
@@ -544,6 +555,7 @@ function tryFinish(t){
 function walk(o,tg,sp,dt){const dx=tg.x-o.x,dy=tg.y-o.y,d=Math.hypot(dx,dy);if(d<4)return true;const s=Math.min(d,sp*dt);o.x+=dx/d*s;o.y+=dy/d*s;return d<6}
 
 function custUpdate(c,dt){
+  if(c.tut)c.pat=c.patMax;
   const pm=patMul();
   if(c.st==='queue'){
     const i=R.cust.filter(x=>x.st==='queue').indexOf(c);
@@ -864,7 +876,7 @@ function draw(){
       if(c.st==='pay'){ctx.font='13px serif';ctx.fillText('💰',c.x,c.y-16)}}
   }
   if(R.battle)drawBattleField();
-  drawEvents();
+  drawEvents(); drawTut();
   // 店寵
   {const d=R.dog;ctx.fillStyle='#0002';ctx.beginPath();ctx.ellipse(d.x,d.y+6,14,5,0,0,7);ctx.fill();
    ctx.save();ctx.translate(d.x,d.y);ctx.scale(-d.face,1);ctx.font='26px serif';ctx.textAlign='center';ctx.fillText('🐕',0,4);ctx.restore();
@@ -1077,11 +1089,11 @@ function showTitle(){
   showOverlay(`<h1>灶跤人生</h1>
   <p>阿嬤走了，留下巷口這間開了四十年的小吃店、兩位老員工、一隻叫小黃的狗，還有 150 萬的債。</p>
   <p>你辭掉工作回來接手。阿福師說：「阿嬤的滷肉飯，不能在你手上倒。」</p>
-  ${helpHtml()}
+  <p>第一次開店，秀玉姨和阿福師會先帶你走一遍。</p>
   <p class="small">可玩原型：只有阿嬤老店、台式 6 道菜與核心營業循環。數值為暫定。</p>
   <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
-  $('bStart').onclick=()=>{newGame();showPrep()};
+  $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
   if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
@@ -1139,9 +1151,10 @@ function showPrep(){
     const free=G.slots-G.stoves.length;
     STOVES.filter(k=>!owned(k)).forEach(k=>{h+=`<div class="box row"><span>${STOVE_FULL[k]}<br><span class="small">${free>0?'有空位，可以買':'先擴店才有空位'}</span></span><button class="btn sm" data-buystove="${k}" ${free>0?'':'disabled'}>${fmt(NEW_STOVE_COST)}</button></div>`});
     return h};
+  const intro=!G.prepIntro?`<div class="box" style="display:flex;gap:10px;align-items:center;border:2px solid var(--red);margin:8px 0"><img alt="" src="${ART_SRC.chef}" style="width:48px"><span><b style="color:var(--red)">阿福師</b><br>每一場開店前都會來這裡：排誰做哪個崗位、去進貨、決定今天賣哪幾道菜跟價錢。食材箱的貨不夠，營業中就沒得做。弄好了按最下面「開始營業」。</span></div>`:'';
   let h=`<h1>第 ${G.day} 天・${MEALS[G.meal]} 準備</h1>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
-   <h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>
+   ${intro}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${ingP(k)>ING[k]?' <b class="neg">漲價中</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
    <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.map(priceRow).join('')}</div>`;
   if(day){
@@ -1181,13 +1194,73 @@ function showPrep(){
     toast(s.name+' 離開了，付了資遣費 '+fmt(c),3);save();showPrep()});
   P.querySelectorAll('[data-bonus]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.bonus);if(G.cash<3000)return toast('現金不夠');G.cash-=3000;s.mood+=s.traits.includes('愛錢')?50:25;showPrep()});
   P.querySelectorAll('[data-talk]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.talk);if(Math.random()<.5){s.mood+=25;toast(s.name+'：好啦，我再做做看')}else{s.mood=Math.max(1,s.mood-5);toast(s.name+'：你根本不懂')}showPrep()});
-  $('bGo').onclick=()=>{R=null;startMeal()};
+  $('bGo').onclick=()=>{G.prepIntro=true;R=null;startMeal()};
   if(day)$('bClose').onclick=()=>{G.staff.forEach(s=>{s.stam=100;s.mood=Math.min(100,s.mood+6)});G.reviews.push(3);
     const weekEnd=G.day%7===0;G.day++;toast('店休一天，大家精神都回來了');
     if(weekEnd)weekSettle({title:'店休日',rev:0,comp:0,util:0,sal:0,served:0,angry:0,lost:0,reviews:[],notes:[]});else showPrep()};
   hud();
 }
 
+
+
+/* ---------- 新手教學（老員工帶你走一遍） ---------- */
+let TUT=null;
+const TOUCH=matchMedia('(pointer:coarse)').matches;
+const SAY={xy:{n:'秀玉姨',img:'waitress'},fu:{n:'阿福師',img:'chef'}};
+const tutCust=()=>R.cust.find(c=>c.tut);
+const TUT_STEPS=[
+ {who:'xy',t:()=>`少年仔，你終於回來了。我是秀玉姨，在這間店做外場三十年囉。先走走看：${TOUCH?'用左下角的搖桿':'用 WASD／方向鍵，或直接點地板'}，走到黃色箭頭指的地方。之後每一步，箭頭都會告訴你要去哪裡。`,
+  at:()=>({x:420,y:262}),done:()=>dist(R.boss,{x:420,y:262})<30},
+ {who:'xy',t:()=>'有客人進來了！客人會自己找空桌坐下。走進 1 號桌的虛線圈圈站著，就會幫他點餐。',
+  start(){spawnGroup();const c=R.cust[R.cust.length-1];Object.assign(c,{tut:true,type:'office',party:1,heads:c.heads.slice(0,1),spr:[1],forceDish:['egg']})},
+  at:()=>SPOTS.t0,done:()=>{const c=tutCust();return c&&c.st==='wait'}},
+ {who:'fu',t:()=>'我是阿福師，掌廚的。客人點了蛋炒飯，要「蛋液」加「白飯」。白飯電鍋裡還有，蛋要去右下角的食材箱拿。走過去，會自動拿一籃。',
+  at:()=>SPOTS.shelf,done:()=>R.boss.carry&&R.boss.carry.basket},
+ {who:'fu',t:()=>'很好。食材拿到備料區才能用，蛋要打成蛋液。走到「打蛋」台，站著別動，就會自動把蛋放下開始打。',
+  at:()=>SPOTS.beat,done:()=>trayItems().length>0||R.tickets.some(t=>t.st==='cutCarry'||t.st==='queued')},
+ {who:'fu',t:()=>'料湊齊了，一份蛋炒飯的料會自己放到上面的「切好區」。走過去拿起來。',
+  at:()=>SPOTS.tray,done:()=>R.tickets.some(t=>t.st==='cutCarry'||t.st==='queued')},
+ {who:'fu',t:()=>'拿去箭頭指的「炒」鍋放下。老店只有煮跟炒兩口爐，以後擴店才買得起蒸籠和炸鍋。',
+  at:()=>SPOTS.wok,done:()=>R.tickets.some(t=>t.st==='queued')},
+ {who:'fu',t:()=>'放好了就站在炒鍋前面，會開始炒。人越多炒越快，一口爐最多三個人。炒好會裝盤送到出餐台。',
+  at:()=>SPOTS.wok,done:()=>R.pass.length>0||R.boss.carry&&R.boss.carry.st==='carried'||tutCust()&&tutCust().st==='eat'},
+ {who:'xy',t:()=>'菜好了！走到出餐台拿菜，再端到 1 號桌給客人。',
+  at:()=>R.boss.carry&&R.boss.carry.st==='carried'?SPOTS.t0:SPOTS.pass,done:()=>{const c=tutCust();return c&&['eat','toPay','pay','leave','gone'].includes(c.st)}},
+ {who:'xy',t:()=>'客人吃完會去櫃台結帳。先走到「收銀」那裡等著，客人來了站著就會幫他結帳。',
+  at:()=>SPOTS.cash,done:()=>R.served>=1},
+ {who:'xy',t:()=>'客人走了，桌上留了髒盤子。走進 1 號桌收碗，再拿去「洗碗」槽。盤子沒洗回來，廚房就沒盤子裝菜了。',
+  at:()=>R.boss.carry&&R.boss.carry.dirty?SPOTS.sink:SPOTS.t0,done:()=>R.sinkDirty>0||(R.washP||0)>0},
+ {who:'fu',t:()=>`員工也能指揮。${TOUCH?'按「👥 員工」叫出員工卡片，':''}點員工（畫面上的人或下面的卡片），再點一個崗位，他就會過去做。老闆站的地方，員工不會跟你搶。`,btn:'知道了'},
+ {who:'xy',t:()=>'最後幾件事：客人等太久會生氣走人，還要賠錢；小黃是阿嬤養的狗，愛狗的客人碰到牠會開心。快打烊時走到門口招牌，可以「暫停收客」。好啦，阿嬤的店就交給你了！',btn:'開始正式營業'},
+];
+function startTutorial(){
+  const snap=JSON.stringify({...G,tutorial:false});
+  G.meal=0; G.bench['蛋奶']=0; G.ready.egg_beat=0;
+  startMeal(); R.spawns=[]; R.ev.at=null;
+  G.staff.forEach((s,i)=>{s.rt.x=470+i*44;s.rt.y=250});
+  TUT={i:-1,snap}; tutNext();
+}
+function tutNext(){
+  TUT.i++; const st=TUT_STEPS[TUT.i]; if(!st)return endTutorial();
+  if(st.start)st.start();
+  const S=SAY[st.who],el=$('tut');
+  el.innerHTML=`<img alt="" src="${ART_SRC[S.img]}"><div class="tx"><b>${S.n}</b><p>${st.t()}</p><div class="tb">${st.btn?`<button class="btn sm" id="tutOk">${st.btn}</button>`:`<span class="small">（照著做就會繼續）</span>`}<button class="btn sm ghost" id="tutSkip">跳過教學</button><span class="small">${TUT.i+1}/${TUT_STEPS.length}</span></div></div>`;
+  el.style.display='flex';
+  if(st.btn)$('tutOk').onclick=tutNext;
+  $('tutSkip').onclick=endTutorial;
+}
+function tutTick(){if(!TUT)return;const st=TUT_STEPS[TUT.i];if(st&&st.done&&st.done())tutNext()}
+function endTutorial(){
+  const snap=TUT.snap;TUT=null;$('tut').style.display='none';
+  G=JSON.parse(snap);R=null;showPrep();
+}
+function drawTut(){
+  if(!TUT)return;const st=TUT_STEPS[TUT.i];if(!st||!st.at)return;const p=st.at();if(!p)return;
+  const now=performance.now()/1000,b=Math.sin(now*5)*6,ph=(now*1.2)%1;
+  ctx.strokeStyle='#ffb020';ctx.lineWidth=4;ctx.globalAlpha=1-ph;ctx.beginPath();ctx.arc(p.x,p.y,(p.r||26)+ph*18,0,7);ctx.stroke();ctx.globalAlpha=1;
+  ctx.fillStyle='#ffb020';ctx.strokeStyle='#2a2420';ctx.lineWidth=2;const y=p.y-(p.r||26)-30+b;
+  ctx.beginPath();ctx.moveTo(p.x-14,y-18);ctx.lineTo(p.x+14,y-18);ctx.lineTo(p.x,y+4);ctx.closePath();ctx.fill();ctx.stroke();
+}
 
 /* ---------- 隨機事件 ---------- */
 // 前 2 週新手保護：不發生負面事件
