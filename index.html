@@ -304,11 +304,13 @@ function spawnGroup(){
 }
 const patMul=()=>1;
 const have=k=>k==='sauce'?G.bench['調味']:G.ready[k];
+// 電鍋：營業中只要白飯低於 RICE_KEEP 碗就一直洗米、蒸飯
+const RICE_T=18, RICE_KEEP=12;
 function prepPlan(){
   const need={};for(const k in ITEM)need[k]=0;
   for(const t of R.tickets)if(t.st==='prepQ')DMAP[t.dish].req.forEach(k=>need[k]++);
   const mr=new Set(G.menu.flatMap(id=>DMAP[id].req));
-  const tgt={};for(const k in ITEM)tgt[k]=need[k]+(mr.has(k)?(k==='rice_cooked'?4:2):0);
+  const tgt={};for(const k in ITEM)tgt[k]=need[k]+(mr.has(k)?(k==='rice_cooked'?RICE_KEEP:2):0);
   const marDef=Math.max(0,tgt.meat_mar-G.ready.meat_mar-G.mar.length), marLoad=Math.min(marDef,4-G.mar.length);
   const riceDef=Math.max(0,tgt.rice_cooked-G.ready.rice_cooked-(G.cooker?G.cooker.n:0));
   const riceLoad=riceDef>0&&!G.cooker?Math.max(0,G.ready.rice_wash-need.rice_wash):0;
@@ -329,7 +331,7 @@ const JOBS={
   cut:[['meat',2,P=>P.cutMeat>0&&G.bench['肉']>0,P=>{G.bench['肉']--;G.ready.meat_cut++},'切肉'],
        ['veg',1.5,P=>P.cutVeg>0&&G.ready.veg_wash>P.need.veg_wash,P=>{G.ready.veg_wash--;G.ready.veg_cut++},'切菜']],
   beat:[['egg',1,P=>P.beat>0&&G.bench['蛋奶']>0,P=>{G.bench['蛋奶']--;G.ready.egg_beat++},'打蛋']],
-  rice:[['load',.8,P=>P.riceLoad>0,P=>{const n=Math.min(10,P.riceLoad);G.ready.rice_wash-=n;G.cooker={n,t:30};},'米下鍋']],
+  rice:[['load',.8,P=>P.riceLoad>0,P=>{const n=Math.min(10,P.riceLoad);G.ready.rice_wash-=n;G.cooker={n,t:RICE_T};},'米下鍋']],
   mar:[['load',.7,P=>P.marLoad>0&&G.ready.meat_cut>0,P=>{G.ready.meat_cut--;G.mar.push(20)},'放進醃料']],
 };
 const canJob=st=>JOBS[st].some(j=>j[2](R.plan||(R.plan=prepPlan())));
@@ -869,7 +871,7 @@ function draw(){
         rice:G.cooker?'煮飯 '+Math.ceil(G.cooker.t)+'秒':'白飯'+r.rice_cooked,mar:'醃'+G.mar.length+' 好'+r.meat_mar}[k];
       label(info,s.x,s.y+66,'#2a2420',10,true);
       if(S.name)label(S.name,s.x,s.y+80,'#8a5a2a',10,true);
-      if(k==='rice'&&G.cooker)bar(s.x-25,s.y-6,50,6,1-G.cooker.t/30,'#3f8f5a');
+      if(k==='rice'&&G.cooker)bar(s.x-25,s.y-6,50,6,1-G.cooker.t/RICE_T,'#3f8f5a');
       if(k==='mar'&&G.mar.length)bar(s.x-25,s.y-6,50,6,1-Math.min(...G.mar)/20,'#3f8f5a');
     } else {label('髒 '+R.sinkDirty+'｜淨 '+G.plates,s.x,s.y+66,'#2a2420',10,true);}
   }
@@ -1109,7 +1111,7 @@ function helpHtml(){return `<h2>怎麼玩</h2><div class="grid">
  <div class="box"><b>走進圈圈自動做事</b><br>爐具、洗碗、出餐台、櫃台和每張桌子都有虛線圈。站進去就會點餐、收碗、端菜、上菜、結帳或幫忙煮。點一下圈圈，老闆會走過去，目的地地上會出現紅圈。</div>
  <div class="box"><b>一起做比較快</b><br>每個圈圈最多 3 人一起用，人越多越快；第 4 個人會在旁邊等位。老闆站的地方員工不會搶，會自動改去做別的事。</div>
  <div class="box"><b>員工</b><br>點員工（畫面或下方卡片）再點崗位就調派。心情低會摸魚📱，體力 0 會累倒😵。</div>
- <div class="box"><b>備料流程</b><br>食材架（右上）拿一籃 → 拿到左邊備料區 → 依食材處理：肉要切、菜要洗再切、蚵仔要洗、蛋要打、米要洗再放電鍋煮 30 秒（一鍋 10 碗）、炸的肉切好要放醃料盆醃 20 秒，調味料不用處理。站在哪個備料點，系統會自動做那裡最需要的事。</div>
+ <div class="box"><b>備料流程</b><br>食材架（右上）拿一籃 → 拿到左邊備料區 → 依食材處理：肉要切、菜要洗再切、蚵仔要洗、蛋要打、米要洗再放電鍋蒸 18 秒（一鍋 10 碗）、炸的肉切好要放醃料盆醃 20 秒，調味料不用處理。站在哪個備料點，系統會自動做那裡最需要的事。</div>
  <div class="box"><b>下鍋</b><br>爐具師傅手邊沒菜時，會先去顧沒人顧的爐具，再來備料區幫忙。一道菜的料都備齊，會自動組成一份放到「切好區」。拿起來走到閃紅圈的爐具放下才開始煮。老店只有煮跟炒，擴店後才能買蒸籠和炸鍋。</div>
  <div class="box"><b>盤子循環</b><br>菜做好要用乾淨盤子。客人吃完要收碗→洗碗→盤子才回來。缺盤廚房就停擺。</div>
  <div class="box"><b>店寵小黃</b><br>阿嬤的狗會在店裡亂逛。碰到客人時，喜歡狗的客人耐心會回升，怕狗的客人耐心會下降；正在吃飯的客人會影響最後給的評價。家庭客最愛狗。</div>
