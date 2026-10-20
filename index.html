@@ -278,6 +278,7 @@ function startMeal(){
   const md=DISHES.filter(d=>G.menu.includes(d.id)), pr=md.reduce((s,d)=>s+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);
   let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
   if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
+  if(!TUT){f*=promoMul();promoTick()}
   delete SPOTS.roach;
   comboSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
@@ -291,7 +292,8 @@ function startMeal(){
 }
 function spawnGroup(){
   const m=G.meal, r=Math.random(), inf=R.ev&&R.ev.infNext; if(inf)R.ev.infNext=false;
-  const type = inf?'foodie': r< (m===2?.1:.07) ? 'foodie' : r < (m===2?.62:.3) ? 'family':'office';
+  const fp=(m===2?.1:.07)*(promoHigh()?2.5:1);
+  const type = inf?'foodie': r< fp ? 'foodie' : r < (m===2?.62:.3) ? 'family':'office';
   const ct=CTYPE[type];
   const c={id:R.cid++,type,party:ri(...ct.party),st:'queue',x:DOOR.x,y:DOOR.y,pat:ct.pat*.8,patMax:ct.pat*.8,
     table:null,dishes:[],servedN:0,eatT:0,col:ct.col,heads:[]};
@@ -602,7 +604,7 @@ function settlePay(c,opt){
   const ct=CTYPE[c.type];
   const q=c.qs.reduce((a,b)=>a+b,0)/c.qs.length;
   const pr=c.dishes.reduce((s,id)=>s+G.prices[id]/DMAP[id].ref,0)/c.dishes.length;
-  let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2;
+  let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2*(promoHigh()?.5:1);
   s=clamp(Math.round(s),1,5);
   if(opt==='free')s=5; else if(mad)s=1;
   let tip=0; if(s>=5&&Math.random()<.5)tip=Math.round(sum*.1);
@@ -759,6 +761,7 @@ function endMeal(){
   G.tutorial=false;
 }
 function dayEnd(res,notes){
+  if((G.branches||[]).length){const bd=branchDay();res.branch=bd.sum;res.notes=(res.notes||[]).concat(bd.notes)}
   G.today={served:0,rev:0,dish:{}};
   G.staff.forEach(s=>{s.stam=Math.min(100,s.stam+30)});
   rollPool();
@@ -1139,6 +1142,7 @@ function showBetween(res,dayOver){
    <div>本場淨額<b class="${net>=0?'pos':'neg'}">${fmt(net)}</b></div><div>現金<b>${fmt(G.cash)}</b></div>
    <div>服務組數<b>${res.served}</b></div><div>生氣離開<b>${res.angry}</b></div><div>等不及走掉<b>${res.lost}</b></div><div>星等<b>${stars().toFixed(1)}</b></div></div>`;
   if(res.week)h+=`<h2>第 ${G.week-1} 週結算</h2><div class="stats"><div>本週營收<b>${fmt(res.week.rev)}</b></div><div>稅金 5%<b class="neg">${fmt(res.week.tax)}</b></div><div>負債利息 0.5%<b class="neg">${fmt(res.week.intr)}</b></div><div>剩餘負債<b>${fmt(G.debt)}</b></div><div>期限<b>第 32 週</b></div></div>`;
+  if(res.branch!=null&&(G.branches||[]).length)h+=`<h2>🏪 分店今日結算</h2><div class="grid">${G.branches.map(b=>`<div class="box"><b>${b.name}</b>　★${b.stars.toFixed(1)}<br><span class="small">營收 ${fmt(b.last.rev)}｜淨利 </span><b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b></div>`).join('')}</div><p>分店合計 <b class="${res.branch>=0?'pos':'neg'}">${fmt(res.branch)}</b>（已加進現金）</p>`;
   if(res.reviews.length)h+=`<h2>客人評論</h2><div class="grid">${res.reviews.map(r=>`<div class="box">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}<br>${r.txt}</div>`).join('')}</div>`;
   if(res.notes.length)h+=`<p class="neg">${res.notes.join('；')}</p>`;
   showOverlay(h+`<div class="foot"><button class="btn" id="bNext">${dayOver?'進入新的一天':'準備下一場'}</button></div>`);
@@ -1202,6 +1206,8 @@ function showPrep(){
       <div class="small">擅長（約）${tops.map(([k,v])=>AB[k]+' '+(Math.round(v/10)*10)).join('・')}</div><div class="small">薪水 ${salary(c)}/餐期</div>
       <button class="btn sm" data-hire="${c.id}" ${G.staff.length>=6?'disabled':''}>聘用 ${fmt(cost)}</button></div>`}).join('')}</div>
       <p class="small">4 桌店面最多 6 位員工。</p>
+      ${promoHtml()}
+      <h2>分店</h2><div class="box row"><span>${(G.branches||[]).length?'目前 '+G.branches.length+' 家分店，昨天合計 '+fmt(G.branches.reduce((a,b)=>a+(b.last?b.last.net:0),0)):'找房仲看店面、派店長，開第一家分店'}</span><button class="btn sm" id="bBranch">🏪 分店管理</button></div>
       ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
@@ -1212,6 +1218,8 @@ function showPrep(){
   showOverlay(h,'prep');
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
+  if($('bBranch'))$('bBranch').onclick=openBranches;
+  P.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{const k=b.dataset.promo,c=promoCost(k);if(!capOk(c))return;G.cash-=c;G.promo=(G.promo||[]).concat([{k,left:PROMO[k].left,hi:($('prTgt')||{}).value==='1'}]);toast(PROMO[k].n+' 開始了！');showPrep()});
   P.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>startRD(b.dataset.rd,($('rdChef')||{}).value));
   P.querySelectorAll('[data-dinner]').forEach(b=>b.onclick=()=>{const cost=300*(G.staff.length+1);if(G.cash<cost)return toast('現金不夠');G.cash-=cost;G.dinnerDay=G.day;
     G.staff.forEach(s=>s.mood=Math.min(100,s.mood+15));G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>relAdd(a,b,15)));toast('大家吃得很開心！');showPrep()});
@@ -1419,6 +1427,143 @@ function leaveCoop(){
   const wasGuest=isGuest();COOP=null;
   if(wasGuest){R=null;delete SPOTS.roach;newGame()}
   showTitle();
+}
+
+
+/* ---------- 宣傳 ---------- */
+const PROMO={flyer:{n:'發傳單',d:'接下來 3 場客人 ×1.2',cost:2000,left:3,mul:1.2},
+  social:{n:'經營社群',d:'接下來 21 場（一週）客人 ×1.15',cost:8000,left:21,mul:1.15},
+  kol:{n:'找網紅業配',d:'剛播出客人 ×1.5，兩週內慢慢退燒',cost:15000,left:42,mul:1.5,decay:1}};
+const promoScale=()=>1+.3*((G.branches||[]).length);
+const promoCost=k=>Math.round(PROMO[k].cost*promoScale()/100)*100;
+function promoMul(){let f=1;(G.promo||[]).forEach(p=>{const P=PROMO[p.k];f*=P.decay?1+(P.mul-1)*p.left/P.left:P.mul});return f}
+function promoTick(){G.promo=(G.promo||[]).map(p=>({...p,left:p.left-1})).filter(p=>p.left>0)}
+const promoHigh=()=>(G.promo||[]).some(p=>p.hi);
+function promoHtml(){
+  const on=G.promo||[];
+  return `<h2>宣傳</h2><p class="small">「衝客量」客人變多；「拉高價客」客人比較不怕貴、美食家變多。店越多宣傳越貴。</p>
+   <div class="row" style="justify-content:flex-start;gap:8px;margin-bottom:6px"><span class="small">目標</span><select id="prTgt"><option value="0">衝客量</option><option value="1">拉高價客</option></select></div>
+   <div class="grid">${Object.entries(PROMO).map(([k,P])=>{const cur=on.find(p=>p.k===k);return `<div class="box"><b>${P.n}</b><br><span class="small">${P.d}</span><br>
+    ${cur?`<span class="small pos">進行中，剩 ${cur.left} 場${cur.hi?'（高價客）':''}</span>`:`<button class="btn sm" data-promo="${k}" style="margin-top:4px">${fmt(promoCost(k))}</button>`}</div>`}).join('')}</div>`;
+}
+
+/* ---------- 分店・房仲・店長 ---------- */
+const CITIES={'台北市':{m:1.6,d:['大安區','信義區','中山區','萬華區']},'新北市':{m:1.2,d:['板橋區','新莊區','三重區','永和區']},'桃園市':{m:1,d:['中壢區','桃園區','龜山區']},
+  '台中市':{m:1.1,d:['西屯區','北區','南屯區']},'台南市':{m:.85,d:['中西區','東區','安平區']},'高雄市':{m:.95,d:['苓雅區','左營區','鳳山區']}};
+const CROWD={office:{n:'上班族',v:1},family:{n:'家庭',v:1.05},student:{n:'學生',v:.85},tour:{n:'觀光客',v:1.25}};
+const DEFECT={leak:{n:'漏水',d:'每週要多花 3,000 修理'},pipe:{n:'管線老舊',d:'營收 −10%'},smoke:{n:'排煙不良',d:'評價每天慢慢掉'}};
+const AGENTS=[{id:'kai',n:'阿凱',co:'巷口房屋',d:'物件便宜，常有小毛病'},{id:'lin',n:'林小姐',co:'大城不動產',d:'物件多在大城市，租金偏高'},{id:'chen',n:'陳經理',co:'好室地產',d:'人流好的店面多，議價比較硬'}];
+const POLICY={rev:{n:'衝營收',d:'營收 +15%，店長心情慢慢掉',r:1.15,c:1,m:-1.5},mood:{n:'顧員工心情',d:'營收 −5%，店長心情上升',r:.95,c:1,m:2},
+  star:{n:'衝評價',d:'營收持平，評價每天上升',r:1,c:1.03,m:0,s:.05},save:{n:'省成本',d:'成本 −15%，營收 −10%',r:.9,c:.85,m:-.5}};
+const branchCond=()=>[[stars()>=3,'老店 3 星以上（目前 '+stars().toFixed(1)+'）'],[G.debt<=750000,'負債還到一半（剩 '+fmt(G.debt)+'，要 ≤ 750,000）'],[G.staff.length+G.pool.length>=1,'有人可以當店長']];
+const agentLike=id=>((G.agents||{})[id]||20);
+function addLike(id,v){G.agents=G.agents||{};G.agents[id]=clamp(agentLike(id)+v,0,100)}
+const mgrSkill=s=>Math.round((s.abil.order+s.abil.serve+s.abil.cash+s.abil.prep+s.abil.buy)/5);
+function makeListing(ag){
+  const cities=ag.id==='lin'?['台北市','新北市','台中市','高雄市']:Object.keys(CITIES);const city=pick(cities),C=CITIES[city];
+  const tables=pick([4,6,6,8,8,10]),flow=ag.id==='chen'?ri(3,5):ri(1,5),crowd=pick(Object.keys(CROWD));
+  const rent=Math.round(tables*1500*C.m*(.8+flow*.1)*(ag.id==='kai'?.85:ag.id==='lin'?1.1:1)/100)*100;
+  const defect=Math.random()<(ag.id==='kai'?.45:.25)?pick(Object.keys(DEFECT)):null;
+  return {id:'L'+Date.now().toString(36)+ri(100,999),ag:ag.id,city,area:pick(C.d),tables,flow,crowd,rent,price:rent*90,rivals:ri(0,3),defect,known:false,checked:false,tries:2,floor:ag.id==='chen'?rnd(.9,.97):rnd(.82,.94)};
+}
+// 房仲估算：用管理力 50、3 星、一般方針試算每天淨利
+function estNet(x,own){const rev=x.tables*x.flow*520*CROWD[x.crowd].v*1.2*1.03*(1-x.rivals*.06);return Math.round((rev-(rev*.35+x.tables*260)-1000-(own?0:x.rent/7))/100)*100}
+function branchDay(){
+  const out=[];let sum=0;
+  for(const b of (G.branches||[])){
+    const m=b.mgr,P=POLICY[b.policy],sk=mgrSkill(m);
+    let rev=b.tables*b.flow*520*CROWD[b.crowd].v*(.7+sk/100)*(.85+b.stars*.06)*P.r*(1-b.rivals*.06)*rnd(.85,1.15);
+    if(b.defect==='pipe')rev*=.9;
+    const crew=b.tables*260, cost=(rev*.35+crew)*P.c+salary(m)*3+(b.own?0:b.rent/7);
+    let net=rev-cost, skim=0;
+    if(m.traits.includes('愛錢')&&m.mood<50&&Math.random()<.3){skim=Math.round(rev*rnd(.05,.1));net-=skim}
+    if(b.defect==='leak'&&G.day%7===0){net-=3000}
+    if(b.defect&&!b.found&&Math.random()<.25){b.found=true;out.push(`⚠ ${b.name} 發現${DEFECT[b.defect].n}：${DEFECT[b.defect].d}`)}
+    b.stars=clamp(b.stars+(P.s||0)+(sk-50)/2000-(b.defect==='smoke'?.03:0)+rnd(-.03,.03),1,5);
+    m.mood=clamp(m.mood+P.m+rnd(-2,2),0,100);
+    if(m.mood<=0){out.push(`😡 ${b.name} 店長 ${m.name} 受不了離職了，分店暫停營業`);b.mgr=null;}
+    net=Math.round(net);b.last={rev:Math.round(rev),net,skim};sum+=net;G.cash+=net;
+  }
+  G.branches=(G.branches||[]).filter(b=>{if(!b.mgr){G.cash+=b.deposit||0;return false}return true});
+  return {sum,notes:out};
+}
+function openBranches(){
+  G.branches=G.branches||[];
+  const cond=branchCond(),ok=cond.every(c=>c[0]);
+  let h=`<h1>🏪 分店管理</h1><p class="small">分店交給店長自動經營，每天打烊時結算進帳。店長的管理力越高、店越好，賺越多；愛錢的店長心情差時可能 A 錢。</p>`;
+  h+=G.branches.length?`<div class="grid">${G.branches.map(b=>`<div class="box"><div class="row"><b>${b.name}</b><span class="small">★ ${b.stars.toFixed(1)}</span></div>
+     <div class="small">${b.city}${b.area}｜${b.tables} 桌｜${CROWD[b.crowd].n}｜人流 ${'●'.repeat(b.flow)}｜${b.own?'自有店面':'週租 '+fmt(b.rent)}${b.found?'｜<span class="neg">'+DEFECT[b.defect].n+'</span>':''}</div>
+     <div class="small">店長 ${b.mgr.name}（管理力 ${mgrSkill(b.mgr)}、心情 ${Math.round(b.mgr.mood)}）</div>
+     <div class="small">${b.last?`昨天營收 ${fmt(b.last.rev)}｜淨利 <b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b>`:'今天開幕'}</div>
+     <div class="row" style="margin-top:4px"><select data-pol="${b.id}">${Object.entries(POLICY).map(([k,p])=>`<option value="${k}"${b.policy===k?' selected':''}>${p.n}</option>`).join('')}</select>
+     <button class="btn sm ghost" data-recall="${b.id}">收掉分店</button></div><div class="small">${POLICY[b.policy].d}</div></div>`).join('')}</div>`:'<div class="box small">還沒有分店。</div>';
+  h+=`<h2>開新分店</h2>`;
+  if(!ok)h+=`<div class="box"><b>開分店的條件</b><br>${cond.map(c=>(c[0]?'✅ ':'⬜ ')+c[1]).join('<br>')}</div>`;
+  else if(G.branches.length>=5)h+=`<div class="box small">目前最多 5 家分店。</div>`;
+  else h+=`<p class="small">找房仲看物件。合作越多次，房仲越願意推好物件，也會主動告訴你隱藏的毛病。</p><div class="grid">${AGENTS.map(a=>`<div class="box"><b>${a.n}</b>　<span class="small">${a.co}</span><br><span class="small">${a.d}</span><br><span class="small">好感度 ${agentLike(a.id)}</span><br><button class="btn sm" data-agent="${a.id}" style="margin-top:4px">找他看物件</button></div>`).join('')}</div>`;
+  h+=`<div class="foot"><button class="btn" id="brBack">回到準備畫面</button></div>`;
+  showOverlay(h,'branch');
+  const P=$('panel');
+  $('brBack').onclick=showPrep;
+  P.querySelectorAll('[data-pol]').forEach(el=>el.onchange=()=>{const b=G.branches.find(x=>x.id===el.dataset.pol);b.policy=el.value;toast(b.name+' 方針改成「'+POLICY[el.value].n+'」');openBranches()});
+  P.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{const b=G.branches.find(x=>x.id===el.dataset.recall);
+    if(!el.dataset.sure){el.dataset.sure=1;el.textContent='確定收掉？';return}
+    G.cash+=b.own?Math.round(b.price*.8):b.deposit;G.branches=G.branches.filter(x=>x!==b);b.mgr.role='rest';G.staff.push(b.mgr);toast(b.name+' 收掉了，'+b.mgr.name+' 回到老店');openBranches()});
+  P.querySelectorAll('[data-agent]').forEach(el=>el.onclick=()=>agentView(el.dataset.agent));
+}
+function agentView(id){
+  const ag=AGENTS.find(a=>a.id===id),like=agentLike(id);
+  G.listings=G.listings||{};
+  if(!G.listings[id]||G.listings[id].day!==G.day){const n=3+Math.floor(like/30);G.listings[id]={day:G.day,items:Array.from({length:n},()=>makeListing(ag))}}
+  const L=G.listings[id].items;
+  L.forEach(x=>{if(like>=60&&x.defect)x.known=true});
+  const fee=Math.round(60000*promoScale()/1000)*1000;
+  showOverlay(`<h1>${ag.n}（${ag.co}）帶你看物件</h1><p class="small">好感度 ${like}${like>=60?'：會主動告訴你物件的毛病':'，好感度 60 以上會主動講物件的毛病'}。開店要付：裝潢 ${fmt(fee)}＋押金兩個月房租。</p>
+   <div class="grid">${L.map(x=>`<div class="box"><b>${x.city}${x.area}</b><div class="small">${x.tables} 桌｜主要客群 ${CROWD[x.crowd].n}｜人流 ${'●'.repeat(x.flow)}${'○'.repeat(5-x.flow)}｜附近對手 ${x.rivals} 家</div>
+     <div class="small">週租 ${fmt(x.rent)}｜或買下 ${fmt(x.price)}</div>
+     <div class="small">${ag.n}估：租的話每天淨利約 <b class="${estNet(x)>=0?'pos':'neg'}">${fmt(estNet(x))}</b></div>
+     <div class="small">${x.known?(x.defect?'<span class="neg">⚠ '+DEFECT[x.defect].n+'：'+DEFECT[x.defect].d+'</span>':'<span class="pos">✔ 檢查過，沒有毛病</span>'):'屋況：不清楚'}</div>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${x.known?'':`<button class="btn sm ghost" data-chk="${x.id}">請人檢查 3,000</button>`}<button class="btn sm" data-pick="${x.id}">就是這間</button></div></div>`).join('')}</div>
+   <div class="foot"><button class="btn ghost" id="agBack">回分店管理</button></div>`,'agent');
+  $('agBack').onclick=openBranches;
+  const P=$('panel');
+  P.querySelectorAll('[data-chk]').forEach(el=>el.onclick=()=>{if(G.cash<3000)return toast('現金不夠');G.cash-=3000;const x=L.find(y=>y.id===el.dataset.chk);x.known=true;x.checked=true;addLike(id,3);agentView(id)});
+  P.querySelectorAll('[data-pick]').forEach(el=>el.onclick=()=>dealView(id,L.find(y=>y.id===el.dataset.pick)));
+}
+function dealView(aid,x,msg=''){
+  const fee=Math.round(60000*promoScale()/1000)*1000;
+  const cands=[...G.staff.map(s=>({s,src:'staff'})),...G.pool.map(s=>({s,src:'pool'}))];
+  showOverlay(`<h1>${x.city}${x.area}・${x.tables} 桌</h1>
+   <p class="small">${CROWD[x.crowd].n}客群｜人流 ${x.flow}/5｜附近對手 ${x.rivals} 家｜${x.known?(x.defect?'⚠ '+DEFECT[x.defect].n:'屋況良好'):'屋況不清楚'}</p>
+   ${msg?`<div class="box" style="font-size:15px">${msg}</div>`:''}
+   <h2>1. 租還是買</h2>
+   <div class="row" style="justify-content:flex-start;gap:12px;flex-wrap:wrap"><label><input type="radio" name="dl" value="rent" checked> 租：週租 ${fmt(x.rent)}，押金 ${fmt(x.rent*8)}</label>
+    <label><input type="radio" name="dl" value="buy"> 買：開價 ${fmt(x.price)}（不用繳租，收店時可賣回 8 成）</label></div>
+   <h2>2. 出價（屋主有底線，出太低會談崩）</h2>
+   <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">${[80,85,90,95,100].map(p=>`<label><input type="radio" name="of" value="${p}"${p===100?' checked':''}> ${p}%</label>`).join('')}<span class="small">還可以談 ${x.tries} 次</span></div>
+   <h2>3. 選店長</h2>
+   <select id="dlMgr">${cands.map((c,i)=>`<option value="${i}">${c.s.name}（管理力 ${mgrSkill(c.s)}${c.s.traits.includes('愛錢')?'、愛錢':''}）${c.src==='pool'?'－外聘 '+fmt(salary(c.s)*21+2000):'－從老店調過去'}</option>`).join('')}</select>
+   <h2>4. 經營方針</h2>
+   <select id="dlPol">${Object.entries(POLICY).map(([k,p])=>`<option value="${k}">${p.n}：${p.d}</option>`).join('')}</select>
+   <p class="small" style="margin-top:8px">另外要付裝潢 ${fmt(fee)}。</p>
+   <div class="foot"><button class="btn ghost" id="dlBack">再看看</button><button class="btn" id="dlGo">出價簽約</button></div>`,'deal');
+  $('dlBack').onclick=()=>agentView(aid);
+  $('dlGo').onclick=()=>{
+    const buy=document.querySelector('input[name=dl]:checked').value==='buy',pct=+document.querySelector('input[name=of]:checked').value/100;
+    const c=cands[+$('dlMgr').value];if(!c)return toast('沒有人可以當店長');
+    if(x.tries<=0)return toast('屋主不想再談了');
+    if(pct<x.floor){x.tries--;addLike(aid,-3);return dealView(aid,x,x.tries>0?`屋主搖頭：「${Math.round(pct*100)}% 太低了啦。」（還能談 ${x.tries} 次）`:'屋主生氣不談了，這間沒了。')}
+    const base=buy?x.price:x.rent, agreed=Math.round(base*pct/100)*100;
+    const hire=c.src==='pool'?salary(c.s)*21+2000:0, total=fee+(buy?agreed:agreed*8)+hire;
+    if(G.cash-total<opCap())return dealView(aid,x,`錢不夠：這筆要 ${fmt(total)}，簽完現金會低於營業本金 ${fmt(opCap())}。`);
+    G.cash-=total;
+    if(c.src==='staff')G.staff=G.staff.filter(s=>s!==c.s);else G.pool=G.pool.filter(s=>s!==c.s);
+    const b={id:'B'+Date.now().toString(36),name:x.area.replace('區','')+'店',city:x.city,area:x.area,tables:x.tables,flow:x.flow,crowd:x.crowd,rent:buy?0:agreed,own:buy,price:buy?agreed:0,
+      deposit:buy?0:agreed*8,rivals:x.rivals,defect:x.defect,found:x.known,mgr:c.s,policy:$('dlPol').value,stars:3,last:null};
+    G.branches=G.branches||[];G.branches.push(b);addLike(aid,10);
+    G.listings[aid].items=G.listings[aid].items.filter(y=>y!==x);save();
+    toast('🎉 '+b.name+' 開幕！店長是 '+c.s.name,3.5);openBranches();
+  };
 }
 
 /* ---------- 研發新菜 ---------- */
