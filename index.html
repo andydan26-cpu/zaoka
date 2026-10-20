@@ -803,11 +803,14 @@ function camera(){
   const {cw,ch}=VIEW, s0=Math.min(cw/W,ch/H), follow=CAM.follow??(s0<0.8);
   if(!follow||!R)return {s:s0,ox:(cw-W*s0)/2,oy:(ch-H*s0)/2,hud:false,top:0};
   const hs=clamp(Math.min(cw/456,ch/360),.38,1.1), top=STRIP*hs, avail=Math.max(60,ch-top);
-  const s=Math.max(s0,Math.min(avail/(ch<260?230:300),cw/430));
+  let s=Math.max(s0,Math.min(avail/(ch<260?230:300),cw/430));
+  if(ch>cw)s=Math.max(s,Math.min(avail/(H-STRIP),cw/300)); // 直立手機：放大到差不多填滿高度
   const vw=cw/s, vh=avail/s;
   const tx=vw>=W?W/2:clamp(R.boss.x,vw/2,W-vw/2), ty=vh>=H-STRIP?STRIP+(H-STRIP)/2:clamp(R.boss.y,STRIP+vh/2,H-vh/2);
   CAM.x+=(tx-CAM.x)*.18;CAM.y+=(ty-CAM.y)*.18;
-  return {s,ox:cw/2-CAM.x*s,oy:top+avail/2-CAM.y*s,hud:true,hs,top};
+  // 直立手機畫面比店還高時，店面貼齊上方訂單列，不留空白
+  const oy=vh>=H-STRIP?top-STRIP*s:top+avail/2-CAM.y*s;
+  return {s,ox:cw/2-CAM.x*s,oy,hud:true,hs,top};
 }
 addEventListener('resize',resize);
 function draw(){
