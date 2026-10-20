@@ -908,7 +908,7 @@ function draw(){
    label('小黃',d.x,d.y+20,'#6b5d50',10,true);
    if(d.react){ctx.font='15px serif';ctx.textAlign='center';ctx.fillText(d.react.like?'💕':'💦',d.x+14,d.y-22)}}
   // 員工
-  for(const s of G.staff){ if(s.role==='rest')continue; const r=s.rt;
+  for(const s of G.staff){ if(s.role==='rest'||!s.rt)continue; const r=s.rt; // 剛聘的人還沒上過班，沒有位置資料
     if(s===selected){ctx.strokeStyle='#c2412d';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(r.x,r.y+18,18,7,0,0,7);ctx.stroke()}
     if(!spr(s.role==='floor'?'waitress':'chef',r.x,r.y+20,s.role==='floor'?58:54,false,true))person(r.x,r.y,'#f2c9a0',s===selected?'#c2412d':'#2f4a43',13,true);
     label(s.name,r.x,r.y+26,'#2a2420',11,true);
@@ -2074,14 +2074,17 @@ function battleQuit(){paused2=false;$('bPause').textContent='暫停';restoreMain
 
 /* ---------- 主迴圈 ---------- */
 function loop(ts){
+  requestAnimationFrame(loop); // 先排下一格：就算這一格出錯，畫面也不會整個停住
+  try{frame(ts)}catch(e){console.error(e)}
+}
+function frame(ts){
   const dt=Math.min(.05,(ts-lastT)/1000||0);lastT=ts;
-  if(isGuest()){coopGuestFrame(dt);if(R)draw();else drawIdle();if(R)hud();requestAnimationFrame(loop);return}
+  if(isGuest()){coopGuestFrame(dt);if(R)draw();else drawIdle();if(R)hud();return}
   if(COOP&&COOP.role==='host')coopHostTick(dt);
   if(R&&!paused)update(dt);
   if(R)draw(); else drawIdle();
   hud();
   barT+=dt;if(barT>.5&&R&&!paused){barT=0;renderBar()}
-  requestAnimationFrame(loop);
 }
 function drawIdle(){const d=VIEW.d;ctx.setTransform(d,0,0,d,0,0);ctx.fillStyle='#2f4a43';ctx.fillRect(0,0,VIEW.cw,VIEW.ch);label('灶跤人生',VIEW.cw/2,VIEW.ch/2,'#d9a441',40,true)}
 try{$('coinIc').src=ART_SRC.coins}catch(e){}
