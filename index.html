@@ -762,6 +762,7 @@ function endMeal(){
   if(G.meal>2){G.meal=0;dayEnd(res,notes)} else {res.title=MEALS[wasMeal]+'結束';showBetween(res,false)}
   G.tutorial=false;
 }
+const DEBT_RATE=.002; // 負債週利率 0.2%（原本 0.5%）
 function dayEnd(res,notes){
   if((G.branches||[]).length){const bd=branchDay();res.branch=bd.sum;res.notes=(res.notes||[]).concat(bd.notes)}
   G.today={served:0,rev:0,dish:{}};
@@ -774,7 +775,7 @@ function dayEnd(res,notes){
   showBetween(res,true);
 }
 function weekSettle(res){
-  const tax=Math.round(G.weekRev*.05), intr=Math.round(G.debt*.005);
+  const tax=Math.round(G.weekRev*.05), intr=Math.round(G.debt*DEBT_RATE);
   G.cash-=tax+intr; G.staff.forEach(s=>s.mood=Math.min(100,s.mood+3));
   res.week={tax,intr,rev:G.weekRev};G.weekRev=0;G.week++;
   if(G.cash<0)return gameOver('週結算付不出稅金與利息，阿嬤的老店被法拍了。');
@@ -1146,7 +1147,7 @@ function showBetween(res,dayOver){
    <div>薪水<b>${fmt(res.sal)}</b></div><div>水電瓦斯<b>${fmt(res.util)}</b></div>
    <div>本場淨額<b class="${net>=0?'pos':'neg'}">${fmt(net)}</b></div><div>現金<b>${fmt(G.cash)}</b></div>
    <div>服務組數<b>${res.served}</b></div><div>生氣離開<b>${res.angry}</b></div><div>等不及走掉<b>${res.lost}</b></div><div>星等<b>${stars().toFixed(1)}</b></div></div>`;
-  if(res.week)h+=`<h2>第 ${G.week-1} 週結算</h2><div class="stats"><div>本週營收<b>${fmt(res.week.rev)}</b></div><div>稅金 5%<b class="neg">${fmt(res.week.tax)}</b></div><div>負債利息 0.5%<b class="neg">${fmt(res.week.intr)}</b></div><div>剩餘負債<b>${fmt(G.debt)}</b></div><div>期限<b>第 32 週</b></div></div>`;
+  if(res.week)h+=`<h2>第 ${G.week-1} 週結算</h2><div class="stats"><div>本週營收<b>${fmt(res.week.rev)}</b></div><div>稅金 5%<b class="neg">${fmt(res.week.tax)}</b></div><div>負債利息 0.2%<b class="neg">${fmt(res.week.intr)}</b></div><div>剩餘負債<b>${fmt(G.debt)}</b></div><div>期限<b>第 32 週</b></div></div>`;
   if(res.branch!=null&&(G.branches||[]).length)h+=`<h2>🏪 分店今日結算</h2><div class="grid">${G.branches.map(b=>`<div class="box"><b>${b.name}</b>　★${b.stars.toFixed(1)}<br><span class="small">營收 ${fmt(b.last.rev)}｜淨利 </span><b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b></div>`).join('')}</div><p>分店合計 <b class="${res.branch>=0?'pos':'neg'}">${fmt(res.branch)}</b>（已加進現金）</p>`;
   if(res.reviews.length)h+=`<h2>客人評論</h2><div class="grid">${res.reviews.map(r=>`<div class="box">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}<br>${r.txt}</div>`).join('')}</div>`;
   if(res.notes.length)h+=`<p class="neg">${res.notes.join('；')}</p>`;
@@ -1216,7 +1217,7 @@ function showPrep(){
       ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
-      <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><button class="btn sm ghost" data-pay="max">能還的全還</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*.005)}</span></div>
+      <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><button class="btn sm ghost" data-pay="max">能還的全還</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*DEBT_RATE)}</span></div>
       <p class="small">營業本金 ${fmt(opCap())}（本場薪水＋水電＋週轉金 5,000）：還債、升級、擴店、聘人都不能動到這筆錢。</p>`;
   }
   h+=`<div class="foot">${day?'<button class="btn ghost" id="bClose">今天店休</button>':''}<button class="btn" id="bGo">開始${MEALS[G.meal]}營業</button></div>`;
