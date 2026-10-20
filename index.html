@@ -282,7 +282,7 @@ function startMeal(){
   delete SPOTS.roach;
   comboSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
-  const base=[10,16,14][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
+  const base=[13,21,18][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
   for(let i=0;i<n;i++){const u=Math.random();
     R.spawns.push(m===1?150*Math.pow(u,1.6):m===2?150*Math.sqrt(u):150*u);}
   R.spawns.sort((a,b)=>a-b);
@@ -364,6 +364,7 @@ function stockAI(s,dt){
   const k=neededIng(); if(k){rt.goShelf=k;return true}
   return false;
 }
+const EXTRA_DISH={office:.2,family:.3,foodie:.4};
 function chooseDishes(c){
   if(c.forceDish)return c.forceDish.slice();
   const ct=CTYPE[c.type], out=[], tmp=availIng();
@@ -374,13 +375,17 @@ function chooseDishes(c){
       if(c.type==='office'&&d.steps.length===1)w*=1.5; if(c.type==='family'&&d.steps.length>1)w*=1.4; if(r>1.8&&c.type!=='foodie')w*=.1; return w;});
     let s=ws.reduce((a,b)=>a+b,0)*Math.random(),k=0;while(s>ws[k]&&k<ws.length-1){s-=ws[k];k++}
     const d=opts[k]; d.ing.forEach(x=>tmp[x]--); out.push(d.id);
+    // 有人會多點一道（家庭客、美食家比較會加點），一桌最多 4 道
+    if(out.length<4&&Math.random()<EXTRA_DISH[c.type]){const o2=opts.filter(x=>x.ing.every(k=>tmp[k]>0));if(o2.length){const d2=pick(o2);d2.ing.forEach(x=>tmp[x]--);out.push(d2.id)}}
   }
-  return out;
+  return out.slice(0,4);
 }
 function takeOrder(c){
   const ds=chooseDishes(c);
   if(!ds.length){leaveAngry(c,'沒食材了',false);return}
-  c.dishes=ds; c.st='wait'; const pm=CTYPE[c.type].pat;
+  c.dishes=ds; c.st='wait';
+  // 飲料、小菜：不用廚房做，結帳時一起算
+  c.side=0;for(let i=0;i<c.party;i++)if(Math.random()<.7)c.side+=ri(30,50); const pm=CTYPE[c.type].pat;
   c.patMax=c.pat=(pm+8*ds.length+4*ds.reduce((s,id)=>s+DMAP[id].steps.length,0))*patMul();
   ds.forEach(id=>{const d=DMAP[id];R.tickets.push({id:R.tid++,c,dish:id,steps:d.steps,si:0,prog:0,pp:0,st:'prepQ',q:[],res:null,mx:0,my:0,mt:0});});
 }
@@ -599,7 +604,7 @@ function settlePay(c,opt){
     evBox('👛 客人忘帶錢包','結帳時客人一臉尷尬：錢包忘在家裡了。',[
       {t:'算了，放他走（他可能會回來付）',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢（他可能給一星）',f(){settlePay(c,'phone')}}],true);return}
   R.payQ=R.payQ.filter(x=>x!==c);
-  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0);
+  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0)+(c.side||0);
   const back=opt==='free'&&Math.random()<.5, mad=opt==='phone'&&Math.random()<.4;
   if(opt==='free'&&!back)sum=0;
   if(back)setTimeout(()=>toast('剛剛忘帶錢包的客人跑回來把錢付清了！',3),400);
