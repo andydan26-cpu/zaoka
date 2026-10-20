@@ -1703,7 +1703,7 @@ function comboSetup(live){
 function comboTick(dt){
   R.cbT=(R.cbT||0)+dt;if(R.cbT>=.5){R.cbT=0;const sig=G.staff.map(s=>s.id+s.role+(s.rt&&s.rt.brk?'b':'')).join();if(sig!==R.cbSig){if(R.cbSig!=null)comboSetup(true);R.cbSig=sig}}
   if(!R.combo)return;
-  if(R.combo.busSink)R.tables.forEach(t=>{if(!t.c&&t.dirty>0&&!t.res){t.auto=(t.auto||0)+dt;if(t.auto>=1.5){R.sinkDirty+=t.dirty;t.dirty=0;t.auto=0;fx(t.x,t.y-40,'✨ 直送水槽','#2f6fa8')}}else t.auto=0});
+  if(R.combo.busSink)R.tables.forEach(t=>{if(!t.c&&t.dirty>0){t.auto=(t.auto||0)+dt;if(t.auto>=1.5){R.sinkDirty+=t.dirty;t.dirty=0;t.bp=0;t.auto=0;fx(t.x,t.y-40,'✨ 直送水槽','#2f6fa8')}}else t.auto=0}); // 外場員工就算已經要去收，也直接送走
   if(R.combo.stockFlow){R.sfT=(R.sfT||0)+dt;if(R.sfT>=4){R.sfT=0;for(const k in G.bench)if(G.bench[k]<2&&G.stock[k]>0){const n=Math.min(3,G.stock[k]);G.stock[k]-=n;G.bench[k]+=n;fx(SPOTS.shelf.x,SPOTS.shelf.y-50,'✨ '+k+' +'+n,'#3f8f5a')}}}
 }
 // 每場結束：同班變熟、相剋會吵、好朋友同班心情好
