@@ -1667,23 +1667,30 @@ const COMBOS=[
  {id:'sameSpot',n:'同站默契',d:'同崗位速度 +25%',m:(a,b)=>a===b&&a!=='floor'&&a!=='rest'},
 ];
 function findCombos(){
-  const on=G.staff.filter(s=>s.role!=='rest'),out=[];
+  const on=G.staff.filter(s=>s.role!=='rest'&&!(s.rt&&s.rt.brk)),out=[];
   for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++){const a=on[i],b=on[j];if(relOf(a,b)<60)continue;
     for(const c of COMBOS)if(c.m(a.role,b.role)||c.m(b.role,a.role)){if(!out.some(o=>o.id===c.id))out.push({...c,who:a.name+'＋'+b.name})}}
   return out;
 }
-function comboSetup(){
+function comboSetup(live){
+  const before=Object.keys(R.combo||{});
   R.combo={};R.cmul={};const cs=findCombos();
   for(const c of cs){R.combo[c.id]=c;
     if(c.id==='plateHand')R.cmul.clean=1.4;
     if(c.id==='boilWok'){R.cmul.boil=1.2;R.cmul.wok=1.2}
     if(c.id==='steamFry'){R.cmul.steam=1.2;R.cmul.fry=1.2}
     if(c.id==='fastPay')R.cmul.cash=2;
-    if(c.id==='sameSpot'){const on=G.staff.filter(s=>s.role!=='rest');for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++)
+    if(c.id==='sameSpot'){const on=G.staff.filter(s=>s.role!=='rest'&&!(s.rt&&s.rt.brk));for(let i=0;i<on.length;i++)for(let j=i+1;j<on.length;j++)
       if(on[i].role===on[j].role&&relOf(on[i],on[j])>=60){const k=on[i].role==='prep'?'prep':on[i].role==='clean'?'clean':on[i].role;R.cmul[k]=(R.cmul[k]||1)*1.25}}}
-  if(cs.length&&!TUT)setTimeout(()=>toast('✨ 連攜技：'+cs.map(c=>c.n).join('、'),3.5),600);
+  if(TUT)return;
+  if(!live){if(cs.length)setTimeout(()=>toast('✨ 連攜技：'+cs.map(c=>c.n).join('、'),3.5),600);return}
+  // 營業中排班有變：重新判斷，排回原本的崗位就會再發動
+  const add=cs.filter(c=>!before.includes(c.id)),lost=before.filter(id=>!R.combo[id]).map(id=>COMBOS.find(c=>c.id===id).n);
+  if(add.length)toast('✨ 連攜技發動：'+add.map(c=>c.n).join('、'),3);
+  else if(lost.length)toast('連攜技暫停：'+lost.join('、')+'（排回原本的崗位就會恢復）',3);
 }
 function comboTick(dt){
+  R.cbT=(R.cbT||0)+dt;if(R.cbT>=.5){R.cbT=0;const sig=G.staff.map(s=>s.id+s.role+(s.rt&&s.rt.brk?'b':'')).join();if(sig!==R.cbSig){if(R.cbSig!=null)comboSetup(true);R.cbSig=sig}}
   if(!R.combo)return;
   if(R.combo.busSink)R.tables.forEach(t=>{if(!t.c&&t.dirty>0&&!t.res){t.auto=(t.auto||0)+dt;if(t.auto>=1.5){R.sinkDirty+=t.dirty;t.dirty=0;t.auto=0;fx(t.x,t.y-40,'✨ 直送水槽','#2f6fa8')}}else t.auto=0});
   if(R.combo.stockFlow){R.sfT=(R.sfT||0)+dt;if(R.sfT>=4){R.sfT=0;for(const k in G.bench)if(G.bench[k]<2&&G.stock[k]>0){const n=Math.min(3,G.stock[k]);G.stock[k]-=n;G.bench[k]+=n;fx(SPOTS.shelf.x,SPOTS.shelf.y-50,'✨ '+k+' +'+n,'#3f8f5a')}}}
