@@ -605,7 +605,7 @@ function settlePay(c,opt){
       {t:'算了，放他走（他可能會回來付）',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢（他可能給一星）',f(){settlePay(c,'phone')}}],true);return}
   R.payQ=R.payQ.filter(x=>x!==c);
   // 隱藏的菜色熟練度：同一道菜做越多次，客人願意多花一點（最多 +30%，不在畫面上顯示）
-  const mBonus=id=>.3*(1-Math.exp(-(((G.mastery||{})[id])||0)/300));
+  const mBonus=id=>masteryBonus(((G.mastery||{})[id])||0);
   let sum=Math.round(c.dishes.reduce((s,id)=>s+G.prices[id]*(1+mBonus(id)),0))+(c.side||0);
   const back=opt==='free'&&Math.random()<.5, mad=opt==='phone'&&Math.random()<.4;
   if(opt==='free'&&!back)sum=0;
@@ -624,6 +624,13 @@ function settlePay(c,opt){
   if(c.inf){if(s>=4){addReview(5,8,'網紅大推：必吃老店');toast('網紅發文大推！評價大漲',3)}else{addReview(1,6,'網紅：普普通通');toast('網紅不太滿意…',3)}}
   if(s>=5)R.fx.push({x:ST.cash.x,y:ST.cash.y+40,img:'perfect',t:1.4});
   c.st='leave';
+}
+// 熟練度加價：600 份前慢慢升到 +30%；之後每多一倍份數再往上一階，最高 +500%
+const M_STEPS=[.3,.6,1,1.6,2.5,3.6,5]; // 600、1200、2400、4800、9600、19200、38400 份
+function masteryBonus(m){
+  if(m<=600)return .3*(1-Math.exp(-m/300))/(1-Math.exp(-2));
+  const x=Math.log2(m/600),i=Math.floor(x);if(i>=M_STEPS.length-1)return M_STEPS[M_STEPS.length-1];
+  return M_STEPS[i]+(M_STEPS[i+1]-M_STEPS[i])*(x-i);
 }
 function deliver(t){
   const c=t.c; c.servedN++;
