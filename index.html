@@ -604,7 +604,9 @@ function settlePay(c,opt){
     evBox('👛 客人忘帶錢包','結帳時客人一臉尷尬：錢包忘在家裡了。',[
       {t:'算了，放他走（他可能會回來付）',f(){settlePay(c,'free')}},{t:'扣押手機，回去拿錢（他可能給一星）',f(){settlePay(c,'phone')}}],true);return}
   R.payQ=R.payQ.filter(x=>x!==c);
-  let sum=c.dishes.reduce((s,id)=>s+G.prices[id],0)+(c.side||0);
+  // 隱藏的菜色熟練度：同一道菜做越多次，客人願意多花一點（最多 +30%，不在畫面上顯示）
+  const mBonus=id=>.3*(1-Math.exp(-(((G.mastery||{})[id])||0)/300));
+  let sum=Math.round(c.dishes.reduce((s,id)=>s+G.prices[id]*(1+mBonus(id)),0))+(c.side||0);
   const back=opt==='free'&&Math.random()<.5, mad=opt==='phone'&&Math.random()<.4;
   if(opt==='free'&&!back)sum=0;
   if(back)setTimeout(()=>toast('剛剛忘帶錢包的客人跑回來把錢付清了！',3),400);
@@ -624,7 +626,8 @@ function settlePay(c,opt){
   c.st='leave';
 }
 function deliver(t){
-  const c=t.c; c.servedN++; c.qs=(c.qs||[]); c.qs.push(t.q.reduce((a,b)=>a+b,0)/t.q.length+((G.dishQ||{})[t.dish]||0));
+  const c=t.c; c.servedN++;
+  if(!TUT&&!R.battle){G.mastery=G.mastery||{};G.mastery[t.dish]=(G.mastery[t.dish]||0)+1} c.qs=(c.qs||[]); c.qs.push(t.q.reduce((a,b)=>a+b,0)/t.q.length+((G.dishQ||{})[t.dish]||0));
   R.tickets=R.tickets.filter(x=>x!==t);
   if(c.servedN>=c.dishes.length){c.st='eat';c.eatT=rnd(7,10);c.patLeft=c.pat/c.patMax}
 }
