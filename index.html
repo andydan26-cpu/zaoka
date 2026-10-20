@@ -412,7 +412,7 @@ function errChance(p,key,isBoss){let e=Math.max(0,40-p.abil[key])/160;if(!isBoss
 function spotAt(p){for(const k in SPOTS){if(!owned(k))continue;const s=SPOTS[k];if(Math.hypot(p.x-s.x,p.y-s.y)<s.r)return k}return null}
 function bossClaims(){const b=R.boss,set=new Set();if(R.bossSpot)set.add(R.bossSpot);if(R.boss2){if(R.boss2Spot)set.add(R.boss2Spot);if(R.boss2.tx!=null){const d2=spotAt({x:R.boss2.tx,y:R.boss2.ty});if(d2)set.add(d2)}}if(b.tx!=null){const d=spotAt({x:b.tx,y:b.ty});if(d)set.add(d)}return set}
 const bossAt=k=>(R.bossSpot===k&&!R.boss.carry)||(!!R.boss2&&R.boss2Spot===k&&!R.boss2.carry);
-const curSt=s=>s.rt&&s.rt.cst!==undefined?s.rt.cst:s.role==='prep'?s.rt.pst:STOVES.includes(s.role)?(s.rt.help||s.role):s.role==='clean'?'sink':null;
+const curSt=s=>s.rt&&s.rt.brk?null:s.rt&&s.rt.cst!==undefined?s.rt.cst:s.role==='prep'?s.rt.pst:STOVES.includes(s.role)?(s.rt.help||s.role):s.role==='clean'?'sink':null;
 function crewOf(k){return G.staff.filter(s=>s.rt&&curSt(s)===k)}
 function stationWorkers(st){
   const out=crewOf(st).filter(s=>s.rt.there&&s.rt.slot>=0&&s.rt.slack<=0&&s.stam>0).map(s=>({p:s,boss:false}));
@@ -452,6 +452,8 @@ function update(dt){
   // 員工
   for(const s of G.staff){
     const rt=s.rt; if(s.role==='rest'||TUT)continue;
+    if(rt.brk){const i=G.staff.filter(x=>x.rt&&x.rt.brk).indexOf(s);walk(rt,{x:560-i*34,y:612},110,dt);rt.there=false;
+      s.stam=Math.min(100,s.stam+dt*2.5);s.mood=Math.min(100,s.mood+dt*.35);continue}
     s.stam=Math.max(0,s.stam-dt*(s.traits.includes('勤勞')?.075:s.traits.includes('愛偷懶')?.06:.1));
     if(s.stam<=0){rt.slack=1;continue}
     if(rt.slack>0){rt.slack-=dt;continue}
@@ -902,8 +904,9 @@ function draw(){
     if(s===selected){ctx.strokeStyle='#c2412d';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(r.x,r.y+18,18,7,0,0,7);ctx.stroke()}
     if(!spr(s.role==='floor'?'waitress':'chef',r.x,r.y+20,s.role==='floor'?58:54,false,true))person(r.x,r.y,'#f2c9a0',s===selected?'#c2412d':'#2f4a43',13,true);
     label(s.name,r.x,r.y+26,'#2a2420',11,true);
+    if(r.brk)label('休息中',r.x,r.y-46,'#3f8f5a',10,true);
     bar(r.x-14,r.y-38,28,4,s.stam/100,s.stam<20?'#b8352a':'#3f8f5a');
-    ctx.font='12px serif';ctx.fillText(s.stam<=0?'😵':r.slack>0?'📱':s.mood>=80?'😄':s.mood<40?'😒':'🙂',r.x+18,r.y-24);
+    ctx.font='12px serif';ctx.fillText(r.brk?'☕':s.stam<=0?'😵':r.slack>0?'📱':s.mood>=80?'😄':s.mood<40?'😒':'🙂',r.x+18,r.y-24);
     if(r.carry){ctx.font='14px serif';ctx.fillText(r.carry.basket?'🧺':r.carry.st==='cutCarry'?'🥬':r.carry.dish?DISH_IC[r.carry.dish]:'🍽',r.x+14,r.y-4);if(r.carry.basket)label(r.carry.basket+'×'+r.carry.n,r.x,r.y-46,'#2a2420',10,true)}
     if(r.slot===-1&&!r.carry&&!r.fetch&&!r.goShelf&&(STOVES.includes(s.role)||s.role==='clean'||s.role==='prep'))label('滿了，等位',r.x,r.y-36,'#b8352a',10,true);
   }
@@ -1011,8 +1014,11 @@ function renderBar(){
   $('bar').innerHTML=G.staff.map(s=>`<div class="card${s===selected?' sel':''}" data-id="${s.id}" tabindex="0">
    <div class="nm"><span>${s.name}</span><span>${ROLES[s.role]}</span></div>
    <div class="small">心情 ${Math.round(s.mood)}</div><div class="meter"><i style="width:${s.mood}%;background:${s.mood<40?'var(--bad)':'var(--gold)'}"></i></div>
-   <div class="small">體力 ${Math.round(s.stam)}</div><div class="meter"><i style="width:${s.stam}%;background:${s.stam<20?'var(--bad)':'var(--ok)'}"></i></div></div>`).join('')
+   <div class="small">體力 ${Math.round(s.stam)}</div><div class="meter"><i style="width:${s.stam}%;background:${s.stam<20?'var(--bad)':'var(--ok)'}"></i></div>
+   ${R&&s.rt&&s.role!=='rest'?`<button class="btn sm ${s.rt.brk?'':'ghost'}" data-brk="${s.id}" style="margin-top:4px;width:100%">${s.rt.brk?'💪 回去工作':'☕ 休息一下'}</button>`:''}</div>`).join('')
    +`<div class="card" style="background:var(--wall-2);color:var(--paper);cursor:default">點員工卡片→再點畫面上的崗位，即可即時調派</div>`;
+  $('bar').querySelectorAll('[data-brk]').forEach(b=>b.onclick=e=>{e.stopPropagation();const s=G.staff.find(x=>x.id==b.dataset.brk);if(!s||!s.rt)return;
+    if(s.rt.brk){s.rt.brk=false;toast(s.name+' 回去工作了')}else{const r=s.role;assign(s,r);s.rt.brk=true;if(selected===s)selected=null;toast(s.name+' 去休息，體力心情慢慢回來（薪水照算）',2.5)}renderBar()});
   $('bar').querySelectorAll('.card[data-id]').forEach(el=>el.onclick=()=>{const s=G.staff.find(x=>x.id==el.dataset.id);selected=selected===s?null:s;renderBar()});
 }
 let barT=0;
@@ -1042,7 +1048,7 @@ function assign(s,role){
   s.rt.goShelf=null; if(s.rt.carry&&s.rt.carry.basket){G.stock[s.rt.carry.basket]+=s.rt.carry.n;s.rt.carry=null}
   if(s.rt.carry&&s.rt.carry.st==='cutCarry'){const t=s.rt.carry;t.res=null;s.rt.carry=null;if(t.cancel)R.tickets=R.tickets.filter(x=>x!==t);else t.st='cut'}
   if(s.rt.carry){if(s.rt.carry.dirty)R.sinkDirty+=s.rt.carry.dirty;if(s.rt.carry.dish){const t=s.rt.carry;t.st='ready';t.res=null;R.pass.push(t)}s.rt.carry=null}
-  s.rt.task=null;s.rt.there=false;s.role=role;toast(s.name+' → '+ROLES[role]);
+  s.rt.task=null;s.rt.there=false;s.rt.brk=false;s.role=role;toast(s.name+' → '+ROLES[role]);
 }
 // 搖桿
 (()=>{const j=$('joy'),k=j.querySelector('i');let id=null;
