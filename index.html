@@ -1188,12 +1188,34 @@ function showTitle(){
   <p>你辭掉工作回來接手。阿福師說：「阿嬤的滷肉飯，不能在你手上倒。」</p>
   <p>第一次開店，秀玉姨和阿福師會先帶你走一遍。</p>
   <p class="small">可玩原型：只有阿嬤老店、台式 6 道菜與核心營業循環。數值為暫定。</p>
-  <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bCoop">🤝 合作模式</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
+  <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bCode">💾 存檔碼</button><button class="btn ghost" id="bCoop">🤝 合作模式</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
   $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
   $('bCoop').onclick=openCoop;
+  $('bCode').onclick=openSaveCode;
   if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];setTables(G.tables||4);if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
+}
+/* ---------- 存檔碼：換手機、換瀏覽器也能接著玩（不用帳號） ---------- */
+async function packSave(js){const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(new TextEncoder().encode(js));w.close();
+  const buf=new Uint8Array(await new Response(cs.readable).arrayBuffer());let b='';for(let i=0;i<buf.length;i++)b+=String.fromCharCode(buf[i]);return 'ZKS1-'+btoa(b)}
+async function unpackSave(code){const b=atob(code.trim().replace(/^ZKS1-/,'').replace(/\s+/g,'')),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  const ds=new DecompressionStream('gzip'),w=ds.writable.getWriter();w.write(u);w.close();return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())}
+async function openSaveCode(){
+  let cur=null;try{cur=localStorage.getItem('zaoka')}catch(e){}
+  let code='';if(cur)try{code=await packSave(cur)}catch(e){code=''}
+  let info='';if(cur)try{const g=JSON.parse(cur);info=`第 ${g.day} 天・第 ${g.week} 週｜現金 ${fmt(g.cash)}｜負債 ${fmt(g.debt)}`}catch(e){}
+  showOverlay(`<h1>💾 存檔碼</h1><p class="small">把存檔變成一串文字，傳到 LINE 或記事本保存。換手機、換瀏覽器、從 Claude 版換到網站版，貼回來就能接著玩，不用註冊帳號。</p>
+   <h2>帶走目前的存檔</h2>${cur?`<p class="small">${info}</p><textarea id="scOut" readonly style="width:100%;height:90px;font-size:11px;word-break:break-all;box-sizing:border-box;background:#fff;color:var(--ink);border-radius:6px;border:1px solid var(--line)">${code}</textarea>
+     <div class="row" style="justify-content:flex-start;gap:8px;margin-top:6px"><button class="btn sm" id="scCopy">複製存檔碼</button><span class="small">存檔碼長度 ${code.length} 字</span></div>`:'<div class="box small">這台裝置還沒有存檔。玩完第一場會自動存檔。</div>'}
+   <h2>讀取存檔碼</h2><textarea id="scIn" placeholder="把存檔碼貼在這裡（ZKS1- 開頭）" style="width:100%;height:80px;font-size:12px;box-sizing:border-box;background:#fff;color:var(--ink);border-radius:6px;border:1px solid var(--line)"></textarea>
+   <p class="small neg">讀取後，這台裝置原本的存檔會被蓋掉。</p>
+   <div class="foot"><button class="btn ghost" id="scBack">返回</button><button class="btn" id="scLoad">讀取並開始</button></div>`);
+  $('scBack').onclick=showTitle;
+  if($('scCopy'))$('scCopy').onclick=async()=>{try{await navigator.clipboard.writeText(code);toast('已複製，貼到 LINE 或記事本保存')}catch(e){$('scOut').select();toast('請長按選取文字後複製')}};
+  $('scLoad').onclick=async()=>{const v=$('scIn').value;if(!v.trim())return toast('先貼上存檔碼');
+    try{const js=await unpackSave(v),g=JSON.parse(js);if(!g||!g.day||!g.staff)throw 0;localStorage.setItem('zaoka',js);toast('讀取成功！');showTitle();setTimeout(()=>{const b=$('bLoad');if(b)b.click()},50)}
+    catch(e){toast('存檔碼不正確，請確認有完整複製',3)}};
 }
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
 
