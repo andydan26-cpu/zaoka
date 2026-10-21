@@ -278,7 +278,7 @@ function startMeal(){
   const md=DISHES.filter(d=>G.menu.includes(d.id)), pr=md.reduce((s,d)=>s+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);
   let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
   if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
-  if(!TUT){f*=promoMul();promoTick()}
+  if(!TUT){f*=promoMul()*rivalMul();promoTick();rivalMealTick()}
   delete SPOTS.roach;
   comboSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
@@ -779,6 +779,7 @@ function endMeal(){
 }
 const DEBT_RATE=.002; // 負債週利率 0.2%（原本 0.5%）
 function dayEnd(res,notes){
+  {const rn=[];rivalDay(rn);if(rn.length)res.notes=(res.notes||[]).concat(rn)}
   if((G.branches||[]).length){const bd=branchDay();res.branch=bd.sum;res.notes=(res.notes||[]).concat(bd.notes)}
   G.today={served:0,rev:0,dish:{}};
   G.staff.forEach(s=>{s.stam=Math.min(100,s.stam+30)});
@@ -1231,6 +1232,7 @@ function showPrep(){
       <button class="btn sm" data-hire="${c.id}" ${G.staff.length>=6?'disabled':''}>聘用 ${fmt(cost)}</button></div>`}).join('')}</div>
       <p class="small">4 桌店面最多 6 位員工。</p>
       ${promoHtml()}
+      <h2>對手</h2><div class="box row"><span>${(G.rivals||[]).length?G.rivals.map(r=>(r.kind==='nem'?'👑':'')+r.name+' '+Math.round(r.str)+(r.ally?'🤝':'')).join('、'):'目前還沒有對手'}</span><button class="btn sm" id="bRival">⚔ 看對手</button></div>
       <h2>分店</h2><div class="box row"><span>${(G.branches||[]).length?'目前 '+G.branches.length+' 家分店，昨天合計 '+fmt(G.branches.reduce((a,b)=>a+(b.last?b.last.net:0),0)):'找房仲看店面、派店長，開第一家分店'}</span><button class="btn sm" id="bBranch">🏪 分店管理</button></div>
       ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
@@ -1243,6 +1245,7 @@ function showPrep(){
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
   if($('bBranch'))$('bBranch').onclick=openBranches;
+  if($('bRival'))$('bRival').onclick=openRivals;
   P.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{const k=b.dataset.promo,c=promoCost(k);if(!capOk(c))return;G.cash-=c;G.promo=(G.promo||[]).concat([{k,left:PROMO[k].left,hi:($('prTgt')||{}).value==='1'}]);toast(PROMO[k].n+' 開始了！');showPrep()});
   P.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>startRD(b.dataset.rd,($('rdChef')||{}).value));
   P.querySelectorAll('[data-dinner]').forEach(b=>b.onclick=()=>{const cost=300*(G.staff.length+1);if(G.cash<cost)return toast('現金不夠');G.cash-=cost;G.dinnerDay=G.day;
@@ -1593,6 +1596,88 @@ function dealView(aid,x,msg=''){
   };
 }
 
+
+/* ---------- AI 對手餐廳 ---------- */
+const RIVAL_TYPES={fast:{n:'連鎖速食',name:'飽飽漢堡',d:'搶上班族、價格戰'},insta:{n:'網美品牌店',name:'拾光打卡咖啡',d:'搶年輕客人、愛找網紅'},
+  cloud:{n:'雲端廚房',name:'快遞食堂',d:'搶外帶客，便宜'},fine:{n:'精緻餐廳',name:'星芒小館',d:'搶美食家，會挖角'}};
+const rivalsOn=()=>(G.rivals||[]).filter(r=>!r.ally);
+function rivalMul(){let f=1;for(const r of rivalsOn())f*=1-r.str/1000;
+  (G.rSteal||[]).forEach(x=>f*=x.mul);
+  if(G.priceWar>0){const md=DISHES.filter(d=>G.menu.includes(d.id)),pr=md.reduce((a,d)=>a+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);if(pr>.92)f*=.85}
+  return f}
+function rivalMealTick(){G.rSteal=(G.rSteal||[]).map(x=>({...x,left:x.left-1})).filter(x=>x.left>0);if(G.priceWar>0)G.priceWar--}
+// 每天打烊：對手出現、實力變化、決定明天要出什麼招
+function rivalDay(notes){
+  if(!G.rivals){if(stars()>=3&&G.day>=5){G.rivals=[{id:'nem',name:'金鼎集團',kind:'nem',owner:'林天賜',str:80}];G.rivalDay=G.day;
+    notes.push('⚔ 金鼎集團盯上你了：老闆林天賜是阿嬤當年的徒弟，偷了配方開成連鎖店。他說阿嬤的店撐不過這一年。準備畫面可以看「對手」')}return}
+  if(G.rivals.filter(r=>r.kind!=='nem').length<3&&G.day-(G.rivalDay||0)>=8){const ks=Object.keys(RIVAL_TYPES).filter(k=>!G.rivals.some(r=>r.type===k));
+    if(ks.length){const k=pick(ks);G.rivals.push({id:'r'+G.day,name:RIVAL_TYPES[k].name,type:k,kind:'small',str:ri(35,60),ally:false});G.rivalDay=G.day;notes.push('🏪 附近開了一家'+RIVAL_TYPES[k].n+'「'+RIVAL_TYPES[k].name+'」，'+RIVAL_TYPES[k].d)}}
+  const st=stars();
+  for(const r of G.rivals){r.str=clamp(r.str+rnd(-1,2.2)-Math.max(0,st-3.5)*3-(r.kind==='nem'?G.rivals.filter(x=>x.ally).length:0),0,100)}
+  G.rivals=G.rivals.filter(r=>{if(r.kind!=='nem'&&r.str<=0){notes.push('📉 '+r.name+' 撐不下去，倒閉了！');return false}return true});
+  const host=rivalsOn().filter(r=>Math.random()<(r.kind==='nem'?.3:.18)*(r.str/60));
+  G.rivalNext=host.length?{id:pick(host).id,act:pick(['steal','poach','price','rumor'])}:null;
+}
+function rivalEvent(next){
+  const ev=G.rivalNext;G.rivalNext=null;const r=(G.rivals||[]).find(x=>x.id===ev.id);if(!r||r.ally)return next();
+  const by=r.kind==='nem'?'金鼎集團':r.name;
+  if(ev.act==='steal')return evBox('⚔ '+by+' 來搶客人','他們在巷口發優惠券、拉客人，接下來 6 場客人少 15%。',[
+    {t:'知道了',f(){G.rSteal=(G.rSteal||[]).concat([{mul:.85,left:6}]);next()}},
+    {t:'花 8,000 加碼宣傳反擊',f(){if(G.cash<8000){toast('現金不夠');G.rSteal=(G.rSteal||[]).concat([{mul:.85,left:6}])}else{G.cash-=8000;r.str=Math.max(0,r.str-8);toast('反擊成功，'+by+' 實力下降')}next()}}]);
+  if(ev.act==='price')return evBox('⚔ '+by+' 打價格戰','對手全面降價。接下來 6 場，你的菜價如果沒有比參考價便宜一成，客人會少 15%。',[
+    {t:'跟著降價（全部菜價 −10%）',f(){for(const k in G.prices)G.prices[k]=Math.max(20,Math.round(G.prices[k]*.9/5)*5);G.priceWar=6;next()}},
+    {t:'不跟，靠品質',f(){G.priceWar=6;next()}}]);
+  if(ev.act==='rumor')return evBox('⚔ '+by+' 散播謠言','網路上有人說你們用過期肉，留言越來越多。',[
+    {t:'花 2,000 發聲明澄清',f(){G.cash-=2000;next()}},{t:'清者自清，不理',f(){G.reviews.push(1,1,1,1);next()}}]);
+  // 挖角：心情差又不忠心的直接走；其他人先警告，可以挽留
+  const s=G.staff.length?pick(G.staff):null;if(!s)return next();
+  const loyal=s.traits.includes('忠心');
+  if(s.mood<40&&!loyal){G.staff=G.staff.filter(x=>x!==s);friendsLeave(s);r.str=Math.min(100,r.str+4);
+    return evBox('⚔ '+by+' 挖角',`${s.name} 心情不好，被 ${by} 開高薪挖走了，連招呼都沒打。`,[{t:'可惡…',f:next}])}
+  return evBox('⚔ '+by+' 挖角',`${by} 私下找 ${s.name}，開了更高的薪水。${s.name}：「老闆，我有點心動…」`,[
+    {t:'加薪 10% 留住他',f(){s.raise=(s.raise||1)*1.1;s.mood=Math.min(100,s.mood+10);next()}},
+    {t:'發獎金 5,000',f(){if(G.cash<5000){toast('現金不夠，他走了');G.staff=G.staff.filter(x=>x!==s);friendsLeave(s)}else{G.cash-=5000;s.mood=Math.min(100,s.mood+(s.traits.includes('愛錢')?30:15))}next()}},
+    {t:loyal?'相信他會留下':'讓他走',f(){if(loyal&&Math.random()<.85){s.mood=Math.min(100,s.mood+5);toast(s.name+'：「我不會走的啦。」')}else{G.staff=G.staff.filter(x=>x!==s);friendsLeave(s);r.str=Math.min(100,r.str+4)}next()}}]);
+}
+const buyPrice=r=>Math.round((r.str*4000+120000)/1000)*1000;
+function openRivals(){
+  const L=G.rivals||[];
+  let h=`<h1>⚔ 對手</h1><p class="small">對手越強，你的客人被搶越多（每 10 點實力約少 1% 客人）。你的評價 3.5 星以上，對手會慢慢變弱；小對手實力歸零就倒閉。</p>`;
+  if(!L.length)h+=`<div class="box small">目前還沒有對手。老店到 3 星、開店滿 5 天後，宿敵就會出現。</div>`;
+  h+=`<div class="grid">${L.map(r=>{const nem=r.kind==='nem',T=RIVAL_TYPES[r.type]||{};return `<div class="box" style="${nem?'border:2px solid var(--red)':''}">
+    <div class="row"><b>${nem?'👑 ':''}${r.name}</b><span class="small">${nem?'宿敵連鎖・老闆 '+r.owner:T.n}</span></div>
+    <div class="small">${nem?'阿嬤當年的徒弟開的連鎖，什麼招都會出':T.d}</div>
+    <div class="meter" style="margin:6px 0"><i style="width:${r.str}%;background:var(--bad)"></i></div><div class="small">實力 ${Math.round(r.str)}／100${r.ally?'｜<b class="pos">🤝 已結盟</b>':''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+     ${r.ally?'':`<button class="btn sm ghost" data-rv="ad" data-id="${r.id}">宣傳反擊 10,000</button><button class="btn sm ghost" data-rv="poach" data-id="${r.id}">反挖角 8,000</button>`}
+     ${!nem&&!r.ally?`<button class="btn sm ghost" data-rv="ally" data-id="${r.id}">結盟 30,000</button>`:''}
+     ${!nem?`<button class="btn sm" data-rv="buy" data-id="${r.id}">併購 ${fmt(buyPrice(r))}</button>`:`<button class="btn sm" data-rv="buynem" data-id="${r.id}" ${r.str>25?'disabled':''}>${r.str>25?'實力 25 以下才能併購':'併購金鼎 800,000'}</button>`}
+    </div></div>`}).join('')}</div>
+   <p class="small">結盟：小對手不再出招，還會一起扯宿敵後腿。併購：小對手變成你的分店（附店長，但忠誠很低）。</p>
+   <div class="foot"><button class="btn" id="rvBack">回到準備畫面</button></div>`;
+  showOverlay(h,'rival');$('rvBack').onclick=showPrep;
+  $('panel').querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>{const r=L.find(x=>x.id===b.dataset.id),a=b.dataset.rv;
+    const pay=c=>{if(!capOk(c))return false;G.cash-=c;return true};
+    if(a==='ad'){if(!pay(10000))return;r.str=Math.max(0,r.str-12);toast(r.name+' 實力 −12')}
+    if(a==='poach'){if(!pay(8000))return;const c=makeCand();if(c.title==='新手學徒'){Object.keys(c.abil).forEach(k=>c.abil[k]=Math.min(100,c.abil[k]+25));c.title='老手'}c.name=c.name;c.traits=c.traits.filter(t=>t!=='忠心');G.pool.unshift(c);r.str=Math.max(0,r.str-6);toast(c.name+' 從 '+r.name+' 跳槽過來，到招募區聘他')}
+    if(a==='ally'){if(!pay(30000))return;r.ally=true;toast('跟 '+r.name+' 結盟了')}
+    if(a==='buy'){if((G.branches||[]).length>=5)return toast('分店已經 5 家了');if(!pay(buyPrice(r)))return;
+      const mgr=makeCand();mgr.mood=30;mgr.title='原店長';const T=RIVAL_TYPES[r.type];
+      G.branches=(G.branches||[]).concat([{id:'B'+Date.now().toString(36),name:r.name,city:'台北市',area:'巷口',tables:8,flow:4,crowd:r.type==='fine'?'tour':r.type==='insta'?'family':'office',rent:0,own:true,price:buyPrice(r),deposit:0,rivals:0,defect:null,found:true,mgr,policy:'mood',stars:3.5,last:null}]);
+      G.rivals=G.rivals.filter(x=>x!==r);toast('🎉 併購了 '+r.name+'！變成你的分店',3.5)}
+    if(a==='buynem'){if(!pay(800000))return;G.rivals=G.rivals.filter(x=>x!==r);G.nemDone=true;save();return showEnding()}
+    save();openRivals()});
+}
+function showEnding(){
+  showOverlay(`<h1>👑 併購金鼎集團</h1><p style="font-size:17px">林天賜在合約上簽下名字時，手一直在抖。</p>
+   <p>「當年我偷了師父的配方，以為只要夠快、夠便宜就能贏。」他看著你端上來的滷肉飯，沉默了很久。「……這個味道，我一直做不出來。」</p>
+   <p>阿福師站在廚房門口，偷偷擦了一下眼角。秀玉姨說：「阿嬤要是看到，一定很高興。」</p>
+   <p>小黃趴在門口，搖了搖尾巴。</p>
+   <p class="small">主線完成！你可以繼續經營，把老店開成全台最大的連鎖。</p>
+   <div class="foot"><button class="btn" id="bEndGo">繼續經營</button></div>`);
+  $('bEndGo').onclick=showPrep;
+}
+
 /* ---------- 研發新菜 ---------- */
 const BASE_DISH=['lurou','egg','oyster','migao','yansu','paigu'];
 const known=id=>(G.known||BASE_DISH).includes(id);
@@ -1875,6 +1960,10 @@ const BETWEEN_EV=[
    evBox('🏬 附近開了新商場',good?'商場帶來大量人潮，接下來三場客人變多。':'商場美食街把客人分流走了，接下來三場客人變少。',[{t:'知道了',f:next}])}},
 ];
 function betweenEvent(next){
+  if(G.meal===0&&G.rivalNext&&!R?.battle)return rivalEvent(()=>betweenEvent2(next));
+  betweenEvent2(next);
+}
+function betweenEvent2(next){
   if(Math.random()>.4)return next();
   const c=BETWEEN_EV.filter(e=>e.ok());if(!c.length)return next();
   pick(c).run(next);
