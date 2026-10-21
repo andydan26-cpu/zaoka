@@ -60,6 +60,7 @@ canvas{display:block;width:100%;height:100%;border-radius:10px;box-shadow:0 6px 
 .btn:disabled{opacity:.4;cursor:not-allowed}
 #overlay{position:fixed;inset:0;background:#1d2b27e6;display:flex;align-items:center;justify-content:center;z-index:20;
   padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+#panel input{background:#fff;color:var(--ink)}
 #panel{background:var(--paper);color:var(--ink);border-radius:12px;max-width:920px;width:100%;max-height:100%;overflow:auto;padding:18px 20px;box-sizing:border-box;touch-action:pan-y;-webkit-user-select:text;user-select:text}
 #panel h1,#panel h2{font-family:var(--f-display);margin:0;text-wrap:balance}
 #panel h1{font-size:30px;color:var(--red)}
@@ -1252,7 +1253,7 @@ function showPrep(){
     ${ok?'':`<div class="small neg">需要${miss.join('、')}（擴店後可買）</div>`}
     <div class="small">備料：${d.req.map(k=>ITEM[k].n).join('、')}</div>
     <div class="small">${d.steps.map(s=>ROLES[s]).join('→')}｜成本 ${d.ing.reduce((a,k)=>a+ING[k],0)}｜合理價 $${fairPrice(d)}</div>${r>1.5?'<div class="small neg">太貴了：有別的菜可以點，客人就不會點這道</div>':''}
-    <div class="row"><button class="btn sm ghost" data-p="${d.id}" data-v="-5">−5</button><b style="font-size:18px">$${G.prices[d.id]}</b><button class="btn sm ghost" data-p="${d.id}" data-v="5">+5</button></div></div>`};
+    <div class="row"><button class="btn sm ghost" data-p="${d.id}" data-v="-5">−5</button><label style="display:flex;align-items:center;gap:2px;font-size:18px;font-weight:700">$<input type="number" inputmode="numeric" min="20" max="9999" step="1" data-pin="${d.id}" value="${G.prices[d.id]}" style="width:72px;font-size:17px;font-weight:700;padding:3px 4px;border-radius:6px;border:1px solid var(--line);text-align:center;background:#fff;color:var(--ink)"></label><button class="btn sm ghost" data-p="${d.id}" data-v="5">+5</button></div></div>`};
   const expandHtml=()=>{let h='';
     {const n=tableN(),nx=SEAT_NEXT[n]||0;h+=nx?`<div class="box row"><span>擴充座位：${n} 桌 → ${nx} 桌<br><span class="small">客人變多（每多 1 桌約 +20%）${nx>8?'；店面往下延伸，營業中畫面跟著老闆捲動':''}，員工上限 ${STAFF_CAP[n]} → ${STAFF_CAP[nx]} 人</span></span><button class="btn sm" data-seat="${nx}">${fmt(SEAT_UP[nx])}</button></div>`:`<div class="box small">座位已經擴到最大（20 桌）</div>`}
     if(G.slots<4)h+=`<div class="box row"><span>擴店：買下隔壁、打通牆壁<br><span class="small">廚房多 1 個爐具空位（目前 ${G.slots}/4）</span></span><button class="btn sm" data-expand="1">${fmt(EXPAND_COST)}</button></div>`;
@@ -1298,6 +1299,7 @@ function showPrep(){
   P.querySelectorAll('[data-plate]').forEach(b=>b.onclick=()=>{const n=+b.dataset.plate,c=n*80;if(G.cash<c)return toast('現金不夠');G.cash-=c;G.plates+=n;G.platesLost=Math.max(0,(G.platesLost||0)-n);showPrep()});
   P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
+  P.querySelectorAll('[data-pin]').forEach(el=>{const set=()=>{const v=Math.round(+el.value);if(!v||v<20){toast('最低 20 元');el.value=G.prices[el.dataset.pin];return}G.prices[el.dataset.pin]=Math.min(9999,v);showPrep()};el.onchange=set;el.onkeydown=e=>{if(e.key==='Enter')el.blur()}});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
   P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(G.staff.length>=staffCap())return toast('員工已經滿了，擴充座位才能多請人');if(!capOk(cost+salary(c)))return;G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
   P.querySelectorAll('[data-seat]').forEach(b=>b.onclick=()=>{const nx=+b.dataset.seat;if(!capOk(SEAT_UP[nx]))return;G.cash-=SEAT_UP[nx];G.tables=nx;setTables(nx);toast('擴充到 '+nx+' 桌了！');showPrep()});
