@@ -324,6 +324,7 @@ function spawnGroup(){
   for(let i=0;i<c.party;i++)c.heads.push(pick(HEADS));
   c.spr=c.heads.map(()=>ri(0,4));
   if(resv){c.resv=true;c.pat=c.patMax=c.pat*1.5}
+  if(!resv&&!inf){regPick(c);if(!c.reg&&!TUT&&!R.battle&&G.week>=2&&Math.random()<.04)c.karen=true}
   if(inf){c.inf=true;c.party=1;c.heads=c.heads.slice(0,1);c.spr=c.spr.slice(0,1)}
   R.cust.push(c);
 }
@@ -413,6 +414,7 @@ function takeOrder(c){
   // 飲料、小菜：不用廚房做，結帳時一起算
   c.side=0;const sp=(wx()==='熱'?.9:.7),sm=(fest()&&fest().side?1.5:1);for(let i=0;i<c.party;i++)if(Math.random()<sp)c.side+=Math.round(ri(30,50)*sm); const pm=CTYPE[c.type].pat;
   c.patMax=c.pat=(pm+8*ds.length+4*ds.reduce((s,id)=>s+DMAP[id].steps.length,0))*patMul();
+  if(c.karen&&!TUT&&!R.battle)setTimeout(()=>{if(R&&c.st==='wait')karenEvent(c)},50);
   ds.forEach(id=>{const d=DMAP[id];R.tickets.push({id:R.tid++,c,dish:id,steps:d.steps,si:0,prog:0,pp:0,st:'prepQ',q:[],res:null,mx:0,my:0,mt:0});});
 }
 function leaveAngry(c,why,payComp=true){
@@ -639,6 +641,7 @@ function settlePay(c,opt){
   let sum=Math.round(c.dishes.reduce((s,id)=>s+G.prices[id]*(1+mBonus(id)),0))+(c.side||0);
   const back=opt==='free'&&Math.random()<.5, mad=opt==='phone'&&Math.random()<.4;
   if(opt==='free'&&!back)sum=0;
+  if(c.disc)sum=Math.round(sum*c.disc); if(c.karenOK)sum*=2; // 奧客處理得好，帳單加倍
   if(back)setTimeout(()=>toast('剛剛忘帶錢包的客人跑回來把錢付清了！',3),400);
   const ct=CTYPE[c.type];
   const q=c.qs.reduce((a,b)=>a+b,0)/c.qs.length;
@@ -646,13 +649,15 @@ function settlePay(c,opt){
   let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2*(promoHigh()?.5:1);
   s=clamp(Math.round(s),1,5);
   if(opt==='free')s=5; else if(mad)s=1;
-  let tip=0; if(s>=5&&Math.random()<.5)tip=Math.round(sum*.1);
+  if(c.karenOK)s=Math.max(s,4);
+  let tip=0; if(s>=5&&Math.random()<(c.reg?1:.5))tip=Math.round(sum*.1);
   R.rev+=sum; R.tips+=tip; R.served++; G.today.served++; if(!TUT&&!R.battle){G.story=G.story||{pages:0};G.story.served=(G.story.served||0)+1} G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   fx(ST.cash.x,ST.cash.y-30,'+'+(sum+tip),'#3f8f5a');
   const txt=s>=5?pick(['好吃到想再來','跟阿嬤做的味道一樣','上菜好快']):s>=4?pick(['不錯吃','價錢合理']):s>=3?pick(['普普','還可以']):pick(['等有點久','有點貴','味道普通']);
   addReview(s,ct.w,opt==='free'?'老闆人超好，下次一定來':mad?'扣我手機，當我是小偷':txt);
   if(c.inf){if(s>=4){addReview(5,8,'網紅大推：必吃老店');toast('網紅發文大推！評價大漲',3)}else{addReview(1,6,'網紅：普普通通');toast('網紅不太滿意…',3)}}
   if(s>=5)R.fx.push({x:ST.cash.x,y:ST.cash.y+40,img:'perfect',t:1.4});
+  regAfter(c,s); if(!TUT&&!R.battle)reqCheck(c,s);
   c.st='leave';
 }
 // 熟練度加價：600 份前慢慢升到 +30%；之後每多一倍份數再往上一階，最高 +500%
@@ -818,6 +823,7 @@ function dayEnd(res,notes){
   if((G.branches||[]).length){const bd=branchDay();res.branch=bd.sum;res.notes=(res.notes||[]).concat(bd.notes)}
   G.today={served:0,rev:0,dish:{}};
   G.weather=rollWeather();
+  {const miss=(G.reqs||[]).filter(r=>!r.done);if(miss.length)(res.notes=res.notes||[]).push('📋 沒完成的熟客委託：'+miss.map(r=>r.who).join('、'));newReqs()}
   G.staff.forEach(s=>{s.stam=Math.min(100,s.stam+30)});
   rollPool();
   res.title='第 '+G.day+' 天打烊';
@@ -1038,7 +1044,7 @@ function drawOrders(vw=W){
   list.slice(0,maxC).forEach((c,i)=>{const x=6+i*112,y=6,f=c.pat/c.patMax;
     ctx.fillStyle='#f3ead8';rr(x,y,106,86,8);ctx.fill();
     ctx.fillStyle=c.dlv?'#2fa86a':'#c2412d';rr(x+4,y+4,38,18,5);ctx.fill();label(c.dlv?'外送':(c.table+1)+' 桌',x+23,y+17,'#fff',11,true);
-    label(c.dlv?'🛵 外送單':CTYPE[c.type].name+'・'+c.party+'人',x+74,y+17,c.dlv?'#2fa86a':'#6b5d50',9,true);
+    label(c.dlv?'🛵 外送單':(c.reg?'⭐'+c.reg:CTYPE[c.type].name)+'・'+c.party+'人',x+74,y+17,c.dlv?'#2fa86a':'#6b5d50',9,true);
     if(c.st==='order'){ctx.font='22px serif';ctx.textAlign='center';ctx.fillText('📝',x+53,y+52);label('等點餐',x+53,y+70,'#6b5d50',10,true)}
     else{const tks=R.tickets.filter(t=>t.c===c);let si=0;
       c.dishes.forEach((d,j)=>{if(j>3)return;const cx=x+16+j*25,done=j<c.servedN;
@@ -1232,7 +1238,9 @@ function showBetween(res,dayOver){
   if(res.branch!=null&&(G.branches||[]).length)h+=`<h2>🏪 分店今日結算</h2><div class="grid">${G.branches.map(b=>`<div class="box"><b>${b.name}</b>　★${b.stars.toFixed(1)}<br><span class="small">營收 ${fmt(b.last.rev)}｜淨利 </span><b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b></div>`).join('')}</div><p>分店合計 <b class="${res.branch>=0?'pos':'neg'}">${fmt(res.branch)}</b>（已加進現金）</p>`;
   if(res.reviews.length)h+=`<h2>客人評論</h2><div class="grid">${res.reviews.map(r=>`<div class="box">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}<br>${r.txt}</div>`).join('')}</div>`;
   if(res.notes.length)h+=`<p class="neg">${res.notes.join('；')}</p>`;
+  h+=replyHtml(res);
   showOverlay(h+`<div class="foot"><button class="btn" id="bNext">${dayOver?'進入新的一天':'準備下一場'}</button></div>`);
+  replyBind();
   $('bNext').onclick=()=>betweenEvent(showPrep);
 }
 
@@ -1289,7 +1297,7 @@ function showPrep(){
    ${G.booking?`<div class="box" style="border:2px solid var(--gold);margin:6px 0">${G.booking.type==='party'?'🎊 這場是「'+G.booking.name+'」包場':'📒 這場有訂位：'+G.booking.name+' '+G.booking.groups+' 桌'}</div>`:''}
    <p class="small" style="margin:2px 0">${calLine()}${G.story&&G.story.pages?`｜📜 秘傳食譜 ${G.story.pages}/4`:''}</p>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
-   ${intro}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
+   ${intro}${(G.reqs||[]).length||(G.regulars||[]).length?reqHtml():''}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${SEASON_ING[seasonI()].cheap===k?' <b class="pos">當季</b>':''}${ingP(k)>ING[k]?' <b class="neg">貴</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 九折</button></span></div>`).join('')}</div>
    <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.filter(d=>known(d.id)).map(priceRow).join('')}</div>`;
   if(day){
@@ -1669,6 +1677,75 @@ function dealView(aid,x,msg=''){
 
 
 
+
+
+/* ---------- 熟客、奧客、負評回覆、熟客委託 ---------- */
+const REG_NAMES=['陳伯','王媽媽','小林','張老師','阿美','黃先生','李奶奶','阿豪','吳小姐','蔡大哥','許阿姨','小方'];
+// 熟客：吃得滿意的客人有機會變熟客；熟客比較有耐心、常帶朋友、小費機率翻倍；連續 3 次不滿意就不來了
+function regPick(c){
+  const L=(G.regulars||[]).filter(r=>!R.cust.some(x=>x.reg===r.n&&x.st!=='gone'));
+  if(!L.length||TUT||R.battle||c.inf)return;
+  if(Math.random()<Math.min(.35,.05*L.length)){const r=pick(L);c.reg=r.n;c.party=Math.min(4,c.party+1);c.heads=c.heads.concat([pick(HEADS)]).slice(0,c.party);c.spr=c.heads.map(()=>ri(0,4));c.pat=c.patMax=c.pat*1.4}
+}
+function regAfter(c,s){
+  if(TUT||R.battle||c.dlv)return;
+  G.regulars=G.regulars||[];
+  if(c.reg){const r=G.regulars.find(x=>x.n===c.reg);if(!r)return;r.v++;r.bad=s<=2?(r.bad||0)+1:0;
+    if(r.bad>=3){G.regulars=G.regulars.filter(x=>x!==r);toast('😢 熟客'+r.n+'連續不滿意，不會再來了',3.5)}return}
+  if(s>=4&&G.regulars.length<12&&Math.random()<(c.karenOK?1:.2)){const left=REG_NAMES.filter(n=>!G.regulars.some(r=>r.n===n));if(!left.length)return;
+    const n=pick(left);G.regulars.push({n,v:1,bad:0});fx(c.x,c.y-40,'⭐ '+n+' 變成熟客了','#d9a441')}
+}
+// 奧客：入座點餐時大鬧，選對處理方式獎勵加倍還變熟客；選錯就鬧大
+const KAREN=[
+ {t:'嫌太貴',d:'客人拍桌大罵：「這種價錢也敢賣？給我打折！」',o:['打八折','送一盤小菜','說我們不打折'],ok:1},
+ {t:'罵員工',d:'客人對著外場大吼：「動作那麼慢，你們到底會不會做生意！」',o:['老闆親自出來道歉','叫員工自己道歉','請他離開'],ok:0},
+ {t:'奇怪要求',d:'客人說：「不要蔥、不要蒜、不要醬，但要跟平常一樣好吃。」',o:['跟他說辦不到','推薦另一道本來就清淡的菜','照做，叫廚房想辦法'],ok:1},
+ {t:'要插隊',d:'客人說：「我認識你們老闆，先幫我出菜！」',o:['好啦先幫你做','笑著說大家都要排隊，送一杯茶','不理他'],ok:1},
+];
+function karenEvent(c){
+  const K=pick(KAREN);c.karenT=K.t;
+  evBox('😤 奧客出現：'+K.t,K.d,shuffle(K.o.map((t,i)=>({t,i}))).map(({t,i})=>({t,f(){
+    if(i===K.ok){c.karenOK=true;c.karen=false;toast('處理得好！這桌客人氣消了，帳單照付還多給',3);G.staff.forEach(s=>s.role==='floor'&&(s.mood=Math.min(100,s.mood+5)))}
+    else{c.karen=false;G.staff.forEach(s=>{if(s.role==='floor')s.mood=Math.max(1,s.mood-8)});
+      if(i===0&&K.ok!==0&&K.t==='嫌太貴'){c.disc=.8;addReview(2,2,'吵一吵就打折，這家很好拗');toast('打折了，但這種事會傳出去…',3)}
+      else{leaveAngry(c,'奧客大鬧',false);addReview(1,2,'奧客：這家服務超爛');toast('奧客大鬧後離開，還留了負評',3)}}}})),true); // 選項順序打亂，不會一看就知道答案
+}
+// 熟客委託：每天開店前，熟客會提出今天的小要求
+const DNAME=id=>DMAP[id].name;
+function newReqs(){
+  G.reqs=[];const regs=G.regulars||[];if(!regs.length)return;
+  const menu=G.menu.filter(id=>known(id)&&dishOk(DMAP[id]));if(!menu.length)return;
+  const n=Math.min(regs.length,ri(1,2));
+  shuffle(regs).slice(0,n).forEach(r=>{const id=pick(menu);
+    if(Math.random()<.6){const k=ri(3,6);G.reqs.push({who:r.n,kind:'dish',dish:id,n:k,base:0,done:false,rw:k*400,d:`今天想跟朋友來吃 ${k} 份${DNAME(id)}`})}
+    else G.reqs.push({who:r.n,kind:'five',dish:id,done:false,rw:2000,d:`想吃一份五星的${DNAME(id)}（客人給 5 星）`})});
+}
+function reqProgress(r){return r.kind==='dish'?Math.min(r.n,(G.today.dish[r.dish]||0)):r.done?1:0}
+function reqCheck(c,s){
+  for(const r of (G.reqs||[])){if(r.done)continue;
+    if(r.kind==='dish'&&(G.today.dish[r.dish]||0)>=r.n){r.done=true;G.cash+=r.rw;G.reviews.push(5,5);toast('📋 '+r.who+'的委託完成！+'+fmt(r.rw),3)}
+    if(r.kind==='five'&&s>=5&&c.dishes.includes(r.dish)){r.done=true;G.cash+=r.rw;G.reviews.push(5,5);toast('📋 '+r.who+'的委託完成！+'+fmt(r.rw),3)}}
+}
+function reqHtml(){
+  const regs=G.regulars||[];
+  return `<h2>⭐ 熟客</h2><p class="small">吃得滿意的客人有機會變熟客（目前 ${regs.length} 位）：比較有耐心、會帶朋友、小費機率翻倍；連續 3 次不滿意就不來了。${regs.length?'<br>'+regs.map(r=>`⭐${r.n}（來過 ${r.v} 次）`).join('　'):''}</p>
+   ${(G.reqs||[]).length?`<div class="grid">${G.reqs.map(r=>`<div class="box"><b>📋 ${r.who}的委託</b><br><span class="small">${r.d}</span><br><span class="small">${r.done?'<b class="pos">✔ 完成</b>':r.kind==='dish'?'進度 '+reqProgress(r)+'／'+r.n:'還沒完成'}｜獎勵 ${fmt(r.rw)}＋好評</span></div>`).join('')}</div>`:''}`;
+}
+// 回覆負評：每場結束可以挑最差的一則回覆
+function replyHtml(res){
+  const bad=(res.reviews||[]).filter(r=>r.s<=2);if(!bad.length||TUT)return '';
+  const w=bad[0];res._reply=w;
+  return `<h2>💬 回覆負評</h2><div class="box"><div>${'★'.repeat(w.s)}${'☆'.repeat(5-w.s)}「${esc(w.txt)}」</div>
+   <div id="rpBox" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm ghost" data-rp="sorry">誠懇道歉</button><button class="btn sm ghost" data-rp="explain">解釋原因</button><button class="btn sm ghost" data-rp="coupon">給優惠券（200）</button></div></div>`;
+}
+function replyBind(){
+  document.querySelectorAll('[data-rp]').forEach(b=>b.onclick=()=>{const a=b.dataset.rp;let msg;
+    if(a==='sorry'){G.reviews.push(3);msg='客人回覆：「好吧，下次再給你們機會。」（評價回升一點）'}
+    else if(a==='explain'){if(Math.random()<.5){G.reviews.push(4);msg='客人：「原來如此，辛苦了。」（評價回升）'}else{G.reviews.push(1);msg='客人：「找藉口！」（越吵越糟）'}}
+    else{if(G.cash<200)return toast('現金不夠');G.cash-=200;G.reviews.push(4);G.regulars=G.regulars||[];const left=REG_NAMES.filter(n=>!G.regulars.some(r=>r.n===n));
+      if(left.length&&G.regulars.length<12){const n=pick(left);G.regulars.push({n,v:0,bad:0});msg='客人收下優惠券，說會再來（⭐'+n+'成為熟客）'}else msg='客人收下優惠券（評價回升）'}
+    $('rpBox').innerHTML=`<span class="small pos">${msg}</span>`});
+}
 
 /* ---------- 外送平台 ---------- */
 const DLV_FEE=.3, DLV_JOIN=5000;
@@ -2102,6 +2179,7 @@ function drawEvents(){
   if(E.broken){const s=ST[E.broken];ctx.fillStyle='#b8352a';rr(s.x-44,s.y-58,88,22,8);ctx.fill();
     label(E.callT>0?'🔧 師傅 '+Math.ceil(E.callT)+' 秒到':'🔧 故障・站上去修',s.x,s.y-42,'#fff',11,true)}
   if(E.roach){const r=E.roach,w=Math.sin(performance.now()/90)*3;ctx.font='24px serif';ctx.textAlign='center';ctx.fillText('🪳',r.x+w,r.y+8);label('除蟲 3 秒',r.x,r.y+34,'#b8352a',11,true)}
+  for(const c of R.cust)if((c.reg||c.karen)&&!c.inf&&!['gone','leave'].includes(c.st)&&!c.dlv){const t=['order','wait','eat'].includes(c.st)?R.tables[c.table]:c;label(c.karen?'😤 奧客':'⭐ '+c.reg,t.x,t.y-(t===c?40:84),c.karen?'#b8352a':'#b8860b',12,true)}
   for(const c of R.cust)if(c.inf&&c.st!=='gone'){const t=['order','wait','eat'].includes(c.st)?R.tables[c.table]:c;label('📸 網紅',t.x,t.y-(t===c?40:84),'#c2412d',13,true)}
 }
 // 場間事件
