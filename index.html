@@ -753,7 +753,7 @@ function endMeal(){
   G.lastDirty=R.sinkDirty+R.tables.reduce((a,t)=>a+t.dirty,0);
   const util=[...R.used].reduce((a,st)=>a+40+20*G.stoveLv[st],0);
   const working=G.staff.filter(s=>s.role!=='rest');
-  const sal=working.reduce((a,s)=>a+salary(s),0);
+  const sal=working.reduce((a,s)=>a+paySal(s),0); // 請假還被排班的人，這場薪水 ×2
   // 心情體力
   const notes=[];
   for(const s of G.staff){
@@ -767,7 +767,7 @@ function endMeal(){
     s.mood=clamp(s.mood,0,100);
   }
   relAfterMeal(notes);
-  G.staff.forEach(s=>{if(s.backRole){s.role=s.backRole;delete s.backRole}});
+  G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave){if(s.role!=='rest')notes.push(s.name+' 請假還來上班，這場薪水給兩倍');delete s.onLeave}});
   const res={rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
@@ -1174,7 +1174,8 @@ function showBetween(res,dayOver){
 let FIRE_ASK=null;
 const severance=s=>salary(s)*21; // 資遣費：一週薪水
 // 營業本金：開一場店至少要留著的錢（本場薪水＋水電＋週轉金）
-function opFloor(){const sal=G.staff.filter(s=>s.role!=='rest').reduce((a,s)=>a+salary(s),0);
+const paySal=s=>salary(s)*(s.onLeave?2:1);
+function opFloor(){const sal=G.staff.filter(s=>s.role!=='rest').reduce((a,s)=>a+paySal(s),0);
   return sal+G.stoves.reduce((a,k)=>a+40+20*G.stoveLv[k],0)}
 function opCap(){return opFloor()+5000}
 // 非營業必要的花費（還債、投資、聘人）不能動到營業本金
@@ -1188,6 +1189,7 @@ function showPrep(){
     return `<div class="box"><div class="row"><b>${s.name}</b><span class="small">${s.title}</span></div>
     <div class="small">${s.traits.map(t=>`<span class="tag" title="${TRAITS[t]}">${t}</span>`).join('')}</div>
     <div class="small">心情 ${Math.round(s.mood)}｜體力 ${Math.round(s.stam)}｜薪水 ${salary(s)}/餐期</div>
+    ${s.onLeave?`<div class="small neg">📝 這場請假中${s.role!=='rest'?`：硬排上班，薪水 ×2（${paySal(s)}）`:'（硬排上班的話薪水 ×2）'}</div>`:''}
     <div class="small">${tops.map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div>
     ${(()=>{const r=G.staff.filter(o=>o!==s).map(o=>[o,relOf(s,o)]).filter(([o,v])=>Math.abs(v)>=30);return r.length?`<div class="small">${r.map(([o,v])=>`${relTag(v).split(' ')[0]} ${o.name}`).join('　')}</div>`:''})()}
     ${s.mood<20?`<div class="neg small">想離職了！<button class="btn sm" data-bonus="${s.id}">發獎金 3,000</button> <button class="btn sm ghost" data-talk="${s.id}">談心</button></div>`:''}
@@ -1850,7 +1852,7 @@ const BETWEEN_EV=[
     {t:'站'+b.name+'那邊',f(){b.mood=Math.min(100,b.mood+10);a.mood=Math.max(1,a.mood-15);relAdd(a,b,-10);next()}},
     {t:'把兩個人叫來調解',f(){if(Math.random()<.5){a.mood=Math.min(100,a.mood+5);b.mood=Math.min(100,b.mood+5);relAdd(a,b,15);toast('兩個人握手和好了')}else{a.mood=Math.max(1,a.mood-8);b.mood=Math.max(1,b.mood-8);relAdd(a,b,-10);toast('越吵越兇，兩個都不爽')}next()}}])}},
  {ok:()=>!evSafe()&&G.staff.some(s=>s.role!=='rest'),run(next){const s=pick(G.staff.filter(x=>x.role!=='rest')),sick=s.stam<45;
-   const rest=()=>{s.backRole=s.role;s.role='rest'};
+   const rest=()=>{s.backRole=s.role;s.role='rest';s.onLeave=true};
    if(sick)return evBox('🤒 病假',`${s.name}累壞了，發燒請病假，這一場不能上班。`,[{t:'好好休息',f(){rest();s.mood=Math.min(100,s.mood+5);next()}}]);
    evBox('📝 事假',`${s.name}說家裡有事，想請這一場的假。`,[
     {t:'准假',f(){rest();s.mood=Math.min(100,s.mood+8);next()}},{t:'不准，人手不夠',f(){s.mood=Math.max(1,s.mood-20);next()}}])}},
