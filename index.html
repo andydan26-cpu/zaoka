@@ -207,6 +207,9 @@ const DISHES=[
 ];
 DISHES.forEach(d=>d.ing=[...new Set(d.req.map(k=>ITEM[k].raw))]);
 const dishOk=d=>d.steps.every(owned);
+// 合理價：參考價依菜的品質調整（研發品質加成、爐具等級）。定價跟合理價比，太貴客人就不點、甚至不來
+function fairPrice(d){const q=((G.dishQ||{})[d.id]||0)+d.steps.reduce((a,st)=>a+((G.stoveLv||{})[st]||1)-1,0)/d.steps.length*6;return Math.round(d.ref*(1+q/100)/5)*5}
+const priceR=d=>G.prices[d.id]/fairPrice(d);
 const DMAP=Object.fromEntries(DISHES.map(d=>[d.id,d]));
 const TABLES=[{x:150,y:330},{x:410,y:330},{x:150,y:500},{x:410,y:500}];
 // 座位擴充：4 → 6 → 8 桌，用餐區重新排位置
@@ -290,15 +293,18 @@ function startMeal(){
      rev:0,comp:0,tips:0,served:0,angry:0,lost:0,used:new Set(),spawns:[],tid:1,cid:1,orders:[],fx:[],newReviews:[],
      boss:{x:520,y:230,carry:null,act:null,actT:0,tx:null,ty:null},cashBusy:null};
   // 客量
-  const md=DISHES.filter(d=>G.menu.includes(d.id)), pr=md.reduce((s,d)=>s+G.prices[d.id]/d.ref,0)/Math.max(1,md.length);
-  let f=clamp(1.5-.5*pr,.35,1.3)*(1+(stars()-3)*.12)*(.8+.05*G.menu.length);
+  const md=DISHES.filter(d=>G.menu.includes(d.id)&&known(d.id)), okd=md.filter(d=>priceR(d)<=1.5), pr=(okd.length?okd:md).reduce((s,d)=>s+priceR(d),0)/Math.max(1,(okd.length?okd:md).length);
+  // 價錢比合理價高越多客人越少；整體貴到 2 倍，一個客人都不會來
+  const pf=pr<=1.3?clamp(1.5-.5*pr,.35,1.3):Math.max(0,.85*(2-pr)/.7);
+  let f=pf*(1+(stars()-3)*.12)*(.8+.05*okd.length);
   if(G.mods&&G.mods.cust){f*=G.mods.cust.v;if(--G.mods.cust.left<=0)G.mods=null}
   if(!TUT){f*=promoMul()*rivalMul()*calMul();promoTick();rivalMealTick()}
   delete SPOTS.roach;
   comboSetup();
   bookingSetup(); dlvSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
-  const base=Math.round([13,21,18][m]*(1+(tableN()-4)*.2)), n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
+  const base=Math.round([13,21,18][m]*(1+(tableN()-4)*.2)), n=pf<=0?0:Math.max(pf<.3?0:3,Math.round(base*f*rnd(.9,1.1)));
+  if(pf<=0&&!TUT)setTimeout(()=>toast('菜價太離譜了，沒有客人願意上門',4),800);
   for(let i=0;i<n;i++){const u=Math.random();
     R.spawns.push(m===1?150*Math.pow(u,1.6):m===2?150*Math.sqrt(u):150*u);}
   R.spawns.sort((a,b)=>a-b);
@@ -387,9 +393,10 @@ function chooseDishes(c){
   if(c.forceDish)return c.forceDish.slice();
   const ct=CTYPE[c.type], out=[], tmp=availIng();
   for(let i=0;i<c.party;i++){
-    const opts=DISHES.filter(d=>G.menu.includes(d.id)&&dishOk(d)&&known(d.id)&&d.ing.every(k=>tmp[k]>0));
+    let opts=DISHES.filter(d=>G.menu.includes(d.id)&&dishOk(d)&&known(d.id)&&d.ing.every(k=>tmp[k]>0));
+    {const fair=opts.filter(d=>priceR(d)<=1.5);if(fair.length)opts=fair} // 有別的菜可以選，就不點貴得離譜的
     if(!opts.length)break;
-    const ws=opts.map(d=>{const r=G.prices[d.id]/d.ref;let w=Math.exp(-(r-1)*ct.sens*2.5);
+    const ws=opts.map(d=>{const r=priceR(d);let w=Math.exp(-(r-1)*ct.sens*2.5);
       if(c.type==='office'&&d.steps.length===1)w*=1.5; if(wx()==='寒流'&&d.steps.includes('boil'))w*=1.8; if(c.type==='family'&&d.steps.length>1)w*=1.4; if(r>1.8&&c.type!=='foodie')w*=.1; return w;});
     let s=ws.reduce((a,b)=>a+b,0)*Math.random(),k=0;while(s>ws[k]&&k<ws.length-1){s-=ws[k];k++}
     const d=opts[k]; d.ing.forEach(x=>tmp[x]--); out.push(d.id);
@@ -634,7 +641,7 @@ function settlePay(c,opt){
   if(back)setTimeout(()=>toast('剛剛忘帶錢包的客人跑回來把錢付清了！',3),400);
   const ct=CTYPE[c.type];
   const q=c.qs.reduce((a,b)=>a+b,0)/c.qs.length;
-  const pr=c.dishes.reduce((s,id)=>s+G.prices[id]/DMAP[id].ref,0)/c.dishes.length;
+  const pr=c.dishes.reduce((s,id)=>s+priceR(DMAP[id]),0)/c.dishes.length;
   let s=3+(c.patLeft+(c.dogBonus||0)-.35)*2.2+(q-55)/22*(c.type==='foodie'?1.6:1)-Math.max(0,pr-1.1)*ct.sens*2*(promoHigh()?.5:1);
   s=clamp(Math.round(s),1,5);
   if(opt==='free')s=5; else if(mad)s=1;
@@ -793,7 +800,7 @@ function endMeal(){
   }
   relAfterMeal(notes);
   if(G.staff.some(s=>s.hid==='xiaowen'))G.staff.forEach(s=>s.mood=Math.min(100,s.mood+5));
-  G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave){if(s.role!=='rest')notes.push(s.name+' 請假還來上班，這場薪水給兩倍');delete s.onLeave}});
+  G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
   const res={rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
@@ -1101,6 +1108,7 @@ cv.addEventListener('pointerdown',e=>{
   if(!paused){const k=spotAt(p);if(k){R.boss.tx=SPOTS[k].sx;R.boss.ty=SPOTS[k].sy}else{R.boss.tx=p.x;R.boss.ty=p.y}}
 });
 function assign(s,role){
+  if(s.onLeave){toast(s.name+' 今天請假，不能排班');return}
   if(s.rt.task){const T=s.rt.task;if(T.tb&&T.tb.res===s)T.tb.res=null;if(T.t&&T.t.res===s&&T.ph===0)T.t.res=null;if(T.k==='cash'&&T.c.handler===s)T.c.handler=null}
   s.rt.help=null; if(s.rt.fetch){s.rt.fetch.res=null;s.rt.fetch=null}
   s.rt.goShelf=null; if(s.rt.carry&&s.rt.carry.basket){G.stock[s.rt.carry.basket]+=s.rt.carry.n;s.rt.carry=null}
@@ -1207,7 +1215,7 @@ function showBetween(res,dayOver){
 let FIRE_ASK=null;
 const severance=s=>salary(s)*21; // 資遣費：一週薪水
 // 營業本金：開一場店至少要留著的錢（本場薪水＋水電＋週轉金）
-const paySal=s=>salary(s)*(s.onLeave?2:1);
+const paySal=s=>salary(s);
 function opFloor(){const sal=G.staff.filter(s=>s.role!=='rest').reduce((a,s)=>a+paySal(s),0);
   return sal+G.stoves.reduce((a,k)=>a+40+20*G.stoveLv[k],0)}
 function opCap(){return opFloor()+5000}
@@ -1217,12 +1225,12 @@ function showPrep(){
   paused=true;selected=null;
   const day=G.meal===0;
   G.menu=G.menu.filter(id=>dishOk(DMAP[id])&&known(id));if(!G.menu.length)G.menu=['egg'];
-  const sel=s=>`<select id="role${s.id}" data-id="${s.id}">${Object.entries(ROLES).filter(([k])=>owned(k)).map(([k,v])=>`<option value="${k}"${s.role===k?' selected':''}>${v}</option>`).join('')}</select>`;
+  const sel=s=>s.onLeave?`<select disabled><option>請假</option></select>`:`<select id="role${s.id}" data-id="${s.id}">${Object.entries(ROLES).filter(([k])=>owned(k)).map(([k,v])=>`<option value="${k}"${s.role===k?' selected':''}>${v}</option>`).join('')}</select>`;
   const staffBox=s=>{const tops=Object.entries(s.abil).sort((a,b)=>b[1]-a[1]).slice(0,4);
     return `<div class="box"><div class="row"><b>${s.name}</b><span class="small">${s.title}</span></div>
     <div class="small">${s.traits.map(t=>`<span class="tag" title="${TRAITS[t]}">${t}</span>`).join('')}</div>${s.hid?`<div class="small pos">★ ${HIDDEN[s.hid].d}</div>`:''}
     <div class="small">心情 ${Math.round(s.mood)}｜體力 ${Math.round(s.stam)}｜薪水 ${salary(s)}/餐期</div>
-    ${s.onLeave?`<div class="small neg">📝 這場請假中${s.role!=='rest'?`：硬排上班，薪水 ×2（${paySal(s)}）`:'（硬排上班的話薪水 ×2）'}</div>`:''}
+    ${s.onLeave?`<div class="small neg">📝 這場請假，不會來上班</div>`:''}
     <div class="small">${tops.map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div>
     ${(()=>{const r=G.staff.filter(o=>o!==s).map(o=>[o,relOf(s,o)]).filter(([o,v])=>Math.abs(v)>=30);return r.length?`<div class="small">${r.map(([o,v])=>`${relTag(v).split(' ')[0]} ${o.name}`).join('　')}</div>`:''})()}
     ${s.mood<20?`<div class="neg small">想離職了！<button class="btn sm" data-bonus="${s.id}">發獎金 3,000</button> <button class="btn sm ghost" data-talk="${s.id}">談心</button></div>`:''}
@@ -1238,12 +1246,12 @@ function showPrep(){
     if(day&&G.staff.length){const cost=300*(G.staff.length+1),done=G.dinnerDay===G.day;
       h+=`<div class="box row" style="margin-top:8px"><span><b>員工會餐</b><br><span class="small">大家心情 +15、彼此感情 +15。一天一次</span></span><button class="btn sm" data-dinner="1" ${done?'disabled':''}>${done?'今天吃過了':'請客 '+fmt(cost)}</button></div>`}
     return h};
-  const priceRow=d=>{const r=G.prices[d.id]/d.ref;const em=r<=.9?'😀':r<=1.1?'🙂':r<=1.3?'😐':'😟';
+  const priceRow=d=>{const r=priceR(d);const em=r<=.9?'😀':r<=1.1?'🙂':r<=1.3?'😐':r<=1.5?'😟':'😡';
     const on=G.menu.includes(d.id), ok=dishOk(d), miss=d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]);
     return `<div class="box" style="${on?'':'opacity:.55'}"><div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="m_${d.id}" data-menu="${d.id}"${on?' checked':''}${ok?'':' disabled'}>${d.name}</label><span>${em}</span></div>
     ${ok?'':`<div class="small neg">需要${miss.join('、')}（擴店後可買）</div>`}
     <div class="small">備料：${d.req.map(k=>ITEM[k].n).join('、')}</div>
-    <div class="small">${d.steps.map(s=>ROLES[s]).join('→')}｜成本 ${d.ing.reduce((a,k)=>a+ING[k],0)}</div>
+    <div class="small">${d.steps.map(s=>ROLES[s]).join('→')}｜成本 ${d.ing.reduce((a,k)=>a+ING[k],0)}｜合理價 $${fairPrice(d)}</div>${r>1.5?'<div class="small neg">太貴了：有別的菜可以點，客人就不會點這道</div>':''}
     <div class="row"><button class="btn sm ghost" data-p="${d.id}" data-v="-5">−5</button><b style="font-size:18px">$${G.prices[d.id]}</b><button class="btn sm ghost" data-p="${d.id}" data-v="5">+5</button></div></div>`};
   const expandHtml=()=>{let h='';
     {const n=tableN(),nx=SEAT_NEXT[n]||0;h+=nx?`<div class="box row"><span>擴充座位：${n} 桌 → ${nx} 桌<br><span class="small">客人變多（每多 1 桌約 +20%）${nx>8?'；店面往下延伸，營業中畫面跟著老闆捲動':''}，員工上限 ${STAFF_CAP[n]} → ${STAFF_CAP[nx]} 人</span></span><button class="btn sm" data-seat="${nx}">${fmt(SEAT_UP[nx])}</button></div>`:`<div class="box small">座位已經擴到最大（20 桌）</div>`}
@@ -1671,6 +1679,7 @@ function dlvHtml(){
 /* ---------- 訂位、包場 ---------- */
 function bookingSetup(){
   const b=G.booking;G.booking=null;R.party=false;R.resvLeft=0;if(!b||TUT||R.battle)return;
+  if(b.type==='resv'&&!G.menu.some(id=>known(id)&&priceR(DMAP[id])<=1.5)){for(let i=0;i<b.groups;i++)addReview(1,1,'看到菜單價錢，訂位直接取消');setTimeout(()=>toast('📒 '+b.name+' 看到菜價氣到取消訂位，還留了一星負評',4),4900);return}
   if(b.type==='resv'){R.resvLeft=b.groups;for(let i=0;i<b.groups;i++)R.spawns.push(.5+i*2);R.spawns.sort((a,c)=>a-c);toast('📒 今天有訂位：'+b.name+' '+b.groups+' 桌',3)}
   if(b.type==='party'){R.party=b;R.spawns=[];for(let i=0;i<4;i++)spawnGroup();R.cust.forEach(c=>{c.buffet=true;c.party=4;c.heads=c.heads.concat(Array(4).fill(0).map(()=>pick(HEADS))).slice(0,4);c.spr=c.heads.map(()=>ri(0,4));c.pat=c.patMax=999});R.closed=true;toast('🎊 今天是'+b.name+'的包場！客人會一直加點',3.5)}
 }
