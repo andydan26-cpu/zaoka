@@ -771,7 +771,7 @@ function endMeal(){
   if(R.battle){battleEnd();return}
   paused=true;
   for(const c of R.cust){
-    if(c.st==='dwait'){dlvLate(c);continue}
+    if(c.st==='dwait'){if(c.pat/c.patMax<.4)dlvLate(c);else{cancelTickets(c);c.st='leave'}continue} // 打烊時還在等、但還沒等太久的外送單，不扣評分
     if(c.buffet){G.plates+=c.servedN;continue}
     if(c.st==='order'||c.st==='wait'){R.comp+=60*c.party;R.angry++;G.plates+=c.servedN;addReview(2,CTYPE[c.type].w,'打烊了還沒上菜')}
     else if(c.st==='eat'){G.plates+=c.dishes.length;c.patLeft=c.patLeft??.5;settlePay(c)}
@@ -802,7 +802,7 @@ function endMeal(){
   relAfterMeal(notes);
   if(G.staff.some(s=>s.hid==='xiaowen'))G.staff.forEach(s=>s.mood=Math.min(100,s.mood+5));
   G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
-  const res={rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
+  const res={dlv:R.dlvDone||0,dlvLate:R.dlvLate||0,rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
   const quit=G.staff.filter(s=>s.mood<=0);G.staff=G.staff.filter(s=>s.mood>0);quit.forEach(s=>{notes.push(s.name+' 心情跌到谷底，離職了');friendsLeave(s,notes)});
@@ -1038,7 +1038,7 @@ function drawOrders(vw=W){
   list.slice(0,maxC).forEach((c,i)=>{const x=6+i*112,y=6,f=c.pat/c.patMax;
     ctx.fillStyle='#f3ead8';rr(x,y,106,86,8);ctx.fill();
     ctx.fillStyle=c.dlv?'#2fa86a':'#c2412d';rr(x+4,y+4,38,18,5);ctx.fill();label(c.dlv?'外送':(c.table+1)+' 桌',x+23,y+17,'#fff',11,true);
-    label(CTYPE[c.type].name+'・'+c.party+'人',x+74,y+17,'#6b5d50',9,true);
+    label(c.dlv?'🛵 外送單':CTYPE[c.type].name+'・'+c.party+'人',x+74,y+17,c.dlv?'#2fa86a':'#6b5d50',9,true);
     if(c.st==='order'){ctx.font='22px serif';ctx.textAlign='center';ctx.fillText('📝',x+53,y+52);label('等點餐',x+53,y+70,'#6b5d50',10,true)}
     else{const tks=R.tickets.filter(t=>t.c===c);let si=0;
       c.dishes.forEach((d,j)=>{if(j>3)return;const cx=x+16+j*25,done=j<c.servedN;
@@ -1053,10 +1053,11 @@ function drawStats(compact,vw=W){
   if(R.battle)return drawBattleBoard(compact,vw);
   const x=vw-194,y=4,w=190,h=compact?88:146;ctx.fillStyle='#f3ead8';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle='#2f6fa8';ctx.lineWidth=3;rr(x,y,w,h,10);ctx.stroke();
   label('今日營業',x+w/2,y+18,'#4a3a2c',13,true);
-  const cells=[['內用',G.today.served+' 組'],['營收','$'+fmt(G.today.rev)],...(compact?[]:G.menu.slice(0,4).map(id=>[DMAP[id].short,(G.today.dish[id]||0)+' 份']))];
+  const cells=[[G.dlvOn?'內用／外送':'內用',G.today.served+' 組'+(G.dlvOn?'／'+(G.today.dlv||0)+' 單':'')],['營收','$'+fmt(G.today.rev)],...(compact?[]:G.menu.slice(0,4).map(id=>[DMAP[id].short,(G.today.dish[id]||0)+' 份']))];
   cells.forEach(([a,b],i)=>{const cx=x+10+(i%2)*88,cy=y+26+Math.floor(i/2)*38;ctx.fillStyle='#fff';rr(cx,cy,82,34,6);ctx.fill();
     label(a,cx+41,cy+13,'#6b5d50',10,true);label(b,cx+41,cy+29,'#2a2420',13,true)});
-  const q=R.cust.filter(c=>c.st==='queue').length;if(q)label('門口等位 '+q+' 組',x+w/2,y+h-4,'#b8352a',10,true);
+  const q=R.cust.filter(c=>c.st==='queue').length,dq=R.cust.filter(c=>c.st==='dwait').length;
+  if(q||dq)label([q?'門口等位 '+q+' 組':'',dq?'🛵 外送待交 '+dq+' 單':''].filter(Boolean).join('｜'),x+w/2,y+h-4,'#b8352a',10,true);
 }
 function person(x,y,skin,shirt,r,outline){
   ctx.fillStyle=shirt;ctx.beginPath();ctx.ellipse(x,y+r*.8,r*.95,r*.75,0,0,7);ctx.fill();
@@ -1204,7 +1205,7 @@ function showBetween(res,dayOver){
    <div>營收<b class="pos">${fmt(res.rev)}</b></div><div>賠錢<b class="neg">${fmt(res.comp)}</b></div>
    <div>薪水<b>${fmt(res.sal)}</b></div><div>水電瓦斯<b>${fmt(res.util)}</b></div>
    <div>本場淨額<b class="${net>=0?'pos':'neg'}">${fmt(net)}</b></div><div>現金<b>${fmt(G.cash)}</b></div>
-   <div>服務組數<b>${res.served}</b></div><div>生氣離開<b>${res.angry}</b></div><div>等不及走掉<b>${res.lost}</b></div><div>星等<b>${stars().toFixed(1)}</b></div></div>`;
+   <div>服務組數<b>${res.served}</b></div>${G.dlvOn||res.dlv||res.dlvLate?`<div>🛵 外送完成<b>${res.dlv} 單</b></div><div>外送遲到<b class="${res.dlvLate?'neg':''}">${res.dlvLate} 單</b></div><div>平台評分<b>${dlvRating().toFixed(1)}</b></div>`:''}<div>生氣離開<b>${res.angry}</b></div><div>等不及走掉<b>${res.lost}</b></div><div>星等<b>${stars().toFixed(1)}</b></div></div>`;
   if(res.week)h+=`<h2>第 ${G.week-1} 週結算</h2><div class="stats"><div>本週營收<b>${fmt(res.week.rev)}</b></div><div>稅金 5%<b class="neg">${fmt(res.week.tax)}</b></div><div>負債利息 0.2%<b class="neg">${fmt(res.week.intr)}</b></div><div>剩餘負債<b>${fmt(G.debt)}</b></div><div>期限<b>第 32 週</b></div></div>`;
   if(res.branch!=null&&(G.branches||[]).length)h+=`<h2>🏪 分店今日結算</h2><div class="grid">${G.branches.map(b=>`<div class="box"><b>${b.name}</b>　★${b.stars.toFixed(1)}<br><span class="small">營收 ${fmt(b.last.rev)}｜淨利 </span><b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b></div>`).join('')}</div><p>分店合計 <b class="${res.branch>=0?'pos':'neg'}">${fmt(res.branch)}</b>（已加進現金）</p>`;
   if(res.reviews.length)h+=`<h2>客人評論</h2><div class="grid">${res.reviews.map(r=>`<div class="box">${'★'.repeat(r.s)}${'☆'.repeat(5-r.s)}<br>${r.txt}</div>`).join('')}</div>`;
@@ -1653,13 +1654,14 @@ const dlvRating=()=>{const r=(G.dlvRev||[]).slice(-30);return r.length?r.reduce(
 function dlvSetup(){
   R.dlvSp=[];if(!G.dlvOn||TUT||R.battle||R.party)return;
   const n=Math.round([2,4,4][G.meal]*(wx()==='雨'?2:wx()==='寒流'?1.4:1)*(1+(dlvRating()-4)*.4)*rnd(.8,1.2));
-  for(let i=0;i<n;i++)R.dlvSp.push(rnd(15,165));R.dlvSp.sort((a,b)=>a-b);
+  for(let i=0;i<n;i++)R.dlvSp.push(rnd(15,135));R.dlvSp.sort((a,b)=>a-b);
 }
 function dlvSpawn(){
   const c={id:R.cid++,type:'office',party:ri(1,2),st:'dwait',dlv:true,table:null,dishes:[],servedN:0,eatT:0,col:'#2fa86a',heads:['#f2c9a0']};
   c.spr=[ri(0,4)];c.dishes=chooseDishes(c);if(!c.dishes.length)return;
-  const i=R.cust.filter(x=>x.st==='dwait').length;c.x=SPOTS.dlv.x-30+(i%4)*20;c.y=SPOTS.dlv.y+30;
-  c.patMax=c.pat=70+c.dishes.length*25;c.side=0;
+  const i=R.cust.filter(x=>x.st==='dwait').length;c.x=SPOTS.dlv.x+44+(i%5)*24;c.y=SPOTS.dlv.y+4-Math.floor(i/5)*26;
+  c.patMax=c.pat=100+c.dishes.length*30;c.side=0;c.seatT=R.t;
+  R.cust.push(c); // 外送員要放進客人清單，訂單列、取餐處才看得到
   c.dishes.forEach(id=>{const d=DMAP[id];R.tickets.push({id:R.tid++,c,dish:id,steps:d.steps,si:0,prog:0,pp:0,st:'prepQ',q:[],res:null,mx:0,my:0,mt:0})});
   fx(c.x,c.y-40,'🛵 外送單','#2fa86a');
 }
@@ -1667,7 +1669,7 @@ function dlvSpawn(){
 function dlvHandoff(c){
   const r=c.pat/c.patMax, sc=r>.5?5:r>.2?4:3;
   let sum=Math.round(c.dishes.reduce((s,id)=>s+G.prices[id]*(1+masteryBonus(((G.mastery||{})[id])||0)),0)*(1-DLV_FEE));
-  R.rev+=sum;R.served++;G.today.served++;G.today.rev+=sum;c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
+  R.rev+=sum;G.today.dlv=(G.today.dlv||0)+1;G.today.rev+=sum;c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   G.dlvRev=(G.dlvRev||[]).concat([sc]).slice(-30);R.dlvDone=(R.dlvDone||0)+1;
   fx(SPOTS.dlv.x,SPOTS.dlv.y-40,'🛵 +'+sum+'（'+'★'.repeat(sc)+'）','#2fa86a');c.st='leave';
 }
