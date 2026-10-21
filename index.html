@@ -209,6 +209,12 @@ DISHES.forEach(d=>d.ing=[...new Set(d.req.map(k=>ITEM[k].raw))]);
 const dishOk=d=>d.steps.every(owned);
 const DMAP=Object.fromEntries(DISHES.map(d=>[d.id,d]));
 const TABLES=[{x:150,y:330},{x:410,y:330},{x:150,y:500},{x:410,y:500}];
+// 座位擴充：4 → 6 → 8 桌，用餐區重新排位置
+const TABLE_LAYOUT={4:{xs:[150,410],ys:[330,500]},6:{xs:[110,300,490],ys:[330,500]},8:{xs:[85,230,375,520],ys:[325,500]}};
+const SEAT_UP={6:40000,8:90000}, STAFF_CAP={4:6,6:8,8:10};
+const tableN=()=>(G&&G.tables)||4, staffCap=()=>STAFF_CAP[tableN()]||6;
+function setTables(n){const L=TABLE_LAYOUT[n]||TABLE_LAYOUT[4];TABLES.length=0;for(const y of L.ys)for(const x of L.xs)TABLES.push({x,y});
+  for(const k in SPOTS)if(/^t\d+$/.test(k))delete SPOTS[k];const r=n>=8?58:62;TABLES.forEach((t,i)=>SPOTS['t'+i]={x:t.x,y:t.y,r,sx:t.x,sy:t.y+46})}
 const DOOR={x:8,y:600}, IDLE={x:520,y:245}, DOG={x:520,y:600};
 const MEALS=['早餐','午餐','晚餐'];
 const SPOTS={};
@@ -221,7 +227,7 @@ const TRAY_MAX=5, KITCHEN=[...PREP,...STOVES,'sink'], EXPAND_COST=60000, NEW_STO
 SPOTS.cash={x:300,y:182,r:44,sx:300,sy:186};
 SPOTS.door={x:66,y:586,r:30,sx:66,sy:590};
 SPOTS.dlv={x:280,y:600,r:30,sx:280,sy:604}; // 外送取餐：拿外送餐點過來交給外送員 // 門口招牌：老闆走過去切換 營業中／暫停收客
-TABLES.forEach((t,i)=>SPOTS['t'+i]={x:t.x,y:t.y,r:62,sx:t.x,sy:t.y+46});
+setTables(4);
 const SLOT=[[-20,4],[20,4],[0,24]], CAP=3;
 const STOVE_COST=[10000,30000,80000,200000,500000], STOVE_SPD=[0,.8,1,1.2,1.4,1.6], STOVE_NM=['','舊','普通','商用','專業','頂級'];
 const TRAITS={'勤勞':'體力掉得慢','愛偷懶':'心情差會摸魚，但最省體力','天生快手':'速度快、略易失誤','慢慢來':'速度慢、幾乎不失誤','樂天':'壞心情減半','玻璃心':'壞心情加重，好心情加成大','愛錢':'獎金效果加倍','忠心':'不容易被挖角'};
@@ -273,6 +279,7 @@ function rollPool(){G.pool=[...(G.pool||[]).filter(c=>c.hid),makeCand(),makeCand
 /* ---------- 營業 ---------- */
 function startMeal(){
   const m=G.meal;
+  setTables(tableN());
   R={t:0,dur:180,cust:[],tables:TABLES.map(t=>({...t,c:null,dirty:0,res:null,op:0,bp:0})),bossSpot:null,claims:new Set(),plan:null,waitMsg:null,ps:Object.fromEntries(PREP.map(k=>[k,{job:null,p:0,name:null}])),dog:{x:DOG.x,y:DOG.y,tx:DOG.x,ty:DOG.y,wait:2,face:1,react:null,rt:0},tickets:[],pass:[],sinkDirty:0,payQ:[],
      rev:0,comp:0,tips:0,served:0,angry:0,lost:0,used:new Set(),spawns:[],tid:1,cid:1,orders:[],fx:[],newReviews:[],
      boss:{x:520,y:230,carry:null,act:null,actT:0,tx:null,ty:null},cashBusy:null};
@@ -285,7 +292,7 @@ function startMeal(){
   comboSetup();
   bookingSetup(); dlvSetup();
   R.ev={water:0,power:0,broken:null,fixP:0,callT:0,wallet:false,infNext:false,at:Math.random()<.5?rnd(25,120):null};
-  const base=[13,21,18][m], n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
+  const base=Math.round([13,21,18][m]*(1+(tableN()-4)*.2)), n=Math.max(3,Math.round(base*f*rnd(.9,1.1)));
   for(let i=0;i<n;i++){const u=Math.random();
     R.spawns.push(m===1?150*Math.pow(u,1.6):m===2?150*Math.sqrt(u):150*u);}
   R.spawns.sort((a,b)=>a-b);
@@ -975,7 +982,7 @@ function draw(){
 }
 function drawDoorSign(){
   if(G.dlvOn){const q=SPOTS.dlv;label('🛵 外送取餐',q.x,q.y+q.r+11,'#2fa86a',11,true)}
-  const d=SPOTS.door, x=d.x-24, y=d.y-56, cl=!!R.closed;
+  const d=SPOTS.door, big=tableN()>4, x=big?d.x+62:d.x-24, y=big?d.y-6:d.y-56, cl=!!R.closed; // 桌子多時招牌移到圈圈右邊，避免被桌子擋住
   ctx.fillStyle='#5b3a24';ctx.fillRect(x-2,y+14,4,26);
   ctx.fillStyle=cl?'#c2412d':'#3d8b5a';ctx.strokeStyle='#2a2420';ctx.lineWidth=2;
   ctx.beginPath();ctx.roundRect?ctx.roundRect(x-34,y-14,68,28,6):ctx.rect(x-34,y-14,68,28);ctx.fill();ctx.stroke();
@@ -1168,7 +1175,7 @@ function showTitle(){
   $('bStart').onclick=()=>{newGame();startTutorial()};
   $('bBattle').onclick=openBattle;
   $('bCoop').onclick=openCoop;
-  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
+  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];setTables(G.tables||4);if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
 
@@ -1231,6 +1238,7 @@ function showPrep(){
     <div class="small">${d.steps.map(s=>ROLES[s]).join('→')}｜成本 ${d.ing.reduce((a,k)=>a+ING[k],0)}</div>
     <div class="row"><button class="btn sm ghost" data-p="${d.id}" data-v="-5">−5</button><b style="font-size:18px">$${G.prices[d.id]}</b><button class="btn sm ghost" data-p="${d.id}" data-v="5">+5</button></div></div>`};
   const expandHtml=()=>{let h='';
+    {const n=tableN(),nx=n<8?n+2:0;h+=nx?`<div class="box row"><span>擴充座位：${n} 桌 → ${nx} 桌<br><span class="small">客人變多（每多 2 桌約 +40%），員工上限 ${STAFF_CAP[n]} → ${STAFF_CAP[nx]} 人</span></span><button class="btn sm" data-seat="${nx}">${fmt(SEAT_UP[nx])}</button></div>`:`<div class="box small">座位已經擴到最大（8 桌）</div>`}
     if(G.slots<4)h+=`<div class="box row"><span>擴店：買下隔壁、打通牆壁<br><span class="small">廚房多 1 個爐具空位（目前 ${G.slots}/4）</span></span><button class="btn sm" data-expand="1">${fmt(EXPAND_COST)}</button></div>`;
     else h+=`<div class="box small">廚房已經擴到最大（4 個爐具）</div>`;
     const free=G.slots-G.stoves.length;
@@ -1248,8 +1256,8 @@ function showPrep(){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
       return `<div class="box"><div class="row"><b>${c.name}</b><span class="tag">${c.title}</span></div><div class="small">${c.traits.join('、')}</div>
       ${c.hid?`<div class="small pos">★ ${HIDDEN[c.hid].d}｜不會被挖角</div>`:''}<div class="small">擅長（約）${tops.map(([k,v])=>AB[k]+' '+(Math.round(v/10)*10)).join('・')}</div><div class="small">薪水 ${salary(c)}/餐期</div>
-      <button class="btn sm" data-hire="${c.id}" ${G.staff.length>=6?'disabled':''}>聘用 ${fmt(cost)}</button></div>`}).join('')}</div>
-      <p class="small">4 桌店面最多 6 位員工。</p>
+      <button class="btn sm" data-hire="${c.id}" ${G.staff.length>=staffCap()?'disabled':''}>聘用 ${fmt(cost)}</button></div>`}).join('')}</div>
+      <p class="small">${tableN()} 桌店面最多 ${staffCap()} 位員工（目前 ${G.staff.length} 位）。</p>
       ${promoHtml()}
       ${dlvHtml()}
       <h2>對手</h2><div class="box row"><span>${(G.rivals||[]).length?G.rivals.map(r=>(r.kind==='nem'?'👑':'')+r.name+' '+Math.round(r.str)+(r.ally?'🤝':'')).join('、'):'目前還沒有對手'}</span><button class="btn sm" id="bRival">⚔ 看對手</button></div>
@@ -1275,7 +1283,8 @@ function showPrep(){
   P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?.9:1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
-  P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(!capOk(cost+salary(c)))return;G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
+  P.querySelectorAll('[data-hire]').forEach(b=>b.onclick=()=>{const c=G.pool.find(x=>x.id==b.dataset.hire),cost=salary(c)*21+2000;if(G.staff.length>=staffCap())return toast('員工已經滿了，擴充座位才能多請人');if(!capOk(cost+salary(c)))return;G.cash-=cost;G.staff.push(c);G.pool=G.pool.filter(x=>x!==c);toast(c.name+' 加入了！');showPrep()});
+  P.querySelectorAll('[data-seat]').forEach(b=>b.onclick=()=>{const nx=+b.dataset.seat;if(!capOk(SEAT_UP[nx]))return;G.cash-=SEAT_UP[nx];G.tables=nx;setTables(nx);toast('擴充到 '+nx+' 桌了！');showPrep()});
   P.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>{if(!capOk(EXPAND_COST))return;G.cash-=EXPAND_COST;G.slots++;toast('打通隔壁了！多一個爐具空位');showPrep()});
   P.querySelectorAll('[data-buystove]').forEach(b=>b.onclick=()=>{const k=b.dataset.buystove;if(!capOk(NEW_STOVE_COST))return;if(G.stoves.length>=G.slots)return;G.cash-=NEW_STOVE_COST;G.stoves.push(k);toast(STOVE_FULL[k]+' 裝好了');showPrep()});
   P.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const k=b.dataset.up,c=STOVE_COST[G.stoveLv[k]-1];if(!capOk(c))return;G.cash-=c;G.stoveLv[k]++;showPrep()});
@@ -1326,7 +1335,7 @@ function encodeSnap(){
   const cid=c=>c?c.id:-1;
   const s={ph:'meal',t:r2(R.t),d:R.dur,cl:R.closed?1:0,wm:R.waitMsg||0,sd:R.sinkDirty,wp:r2(R.washP||0),
     g:{pl:G.plates,be:ING_K().map(k=>G.bench[k]),sk:ING_K().map(k=>G.stock[k]),rd:READY_K.map(k=>G.ready[k]),ma:[G.mar.length,G.mar.length?r0(Math.min(...G.mar)):0],
-       ck:G.cooker?r0(G.cooker.t):-1,so:G.stoves,sl:G.slots,lv:STOVES.map(k=>G.stoveLv[k]),to:[G.today.served,G.today.rev,G.today.dish],me:G.menu,ca:G.cash,dy:G.day,ml:G.meal,wk:G.week,st:r2(stars())},
+       ck:G.cooker?r0(G.cooker.t):-1,so:G.stoves,sl:G.slots,lv:STOVES.map(k=>G.stoveLv[k]),to:[G.today.served,G.today.rev,G.today.dish],me:G.menu,tn:tableN(),ca:G.cash,dy:G.day,ml:G.meal,wk:G.week,st:r2(stars())},
     b:[encBoss(R.boss),encBoss(R.boss2)],
     f:G.staff.map(s=>[s.id,s.name,s.role,s.rt?r0(s.rt.x):0,s.rt?r0(s.rt.y):0,r0(s.stam),r0(s.mood),s.rt&&s.rt.slack>0?1:0,s.rt?carryCode(s.rt.carry):0,s.rt?curSt(s):null,s.rt&&s.rt.there?1:0,s.rt?s.rt.slot:0]),
     c:R.cust.filter(c=>c.st!=='gone').slice(0,14).map(c=>[c.id,c.st,r0(c.x),r0(c.y),c.table??-1,c.spr,r2(c.pat/c.patMax),c.party,c.type,c.dishes,c.servedN,c.inf?1:0,r0(c.seatT||0)]),
@@ -1346,7 +1355,7 @@ function encodeSnap(){
 function applySnap(s){
   const prev=COOP.prevPos||{},pos={};
   const ease=(key,o)=>{const p=prev[key];o._tx=o.x;o._ty=o.y;if(p){o.x=p.x;o.y=p.y}pos[key]=o};
-  const g=s.g;G=G||{};
+  const g=s.g;G=G||{};if(g.tn&&g.tn!==tableN()){G.tables=g.tn;setTables(g.tn)}
   Object.assign(G,{plates:g.pl,bench:Object.fromEntries(ING_K().map((k,i)=>[k,g.be[i]])),stock:Object.fromEntries(ING_K().map((k,i)=>[k,g.sk[i]])),
     ready:Object.fromEntries(READY_K.map((k,i)=>[k,g.rd[i]])),mar:Array(g.ma[0]).fill(g.ma[1]),cooker:g.ck>=0?{t:g.ck}:null,stoves:g.so,slots:g.sl,
     stoveLv:Object.fromEntries(STOVES.map((k,i)=>[k,g.lv[i]])),today:{served:g.to[0],rev:g.to[1],dish:g.to[2]},menu:g.me,cash:g.ca,day:g.dy,meal:g.ml,week:g.wk,reviews:[g.st]});
