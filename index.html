@@ -864,6 +864,7 @@ function endMeal(){
     s.mood=clamp(s.mood,0,100);
   }
   relAfterMeal(notes);
+  mentorAfterMeal(notes);
   if(eq('rest'))G.staff.forEach(s=>s.stam=Math.min(100,s.stam+8));
   if(G.staff.some(s=>s.hid==='xiaowen'))G.staff.forEach(s=>s.mood=Math.min(100,s.mood+5));
   G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
@@ -899,7 +900,8 @@ function weekSettle(res){
   const tax=Math.round(G.weekRev*.05), intr=Math.round(G.debt*DEBT_RATE);
   G.cash-=tax+intr; G.staff.forEach(s=>s.mood=Math.min(100,s.mood+3));
   res.week={tax,intr,rev:G.weekRev};G.weekRev=0;G.week++;
-  if(G.cash<0)return gameOver('週結算付不出稅金與利息，阿嬤的老店被法拍了。');
+  res.notes=res.notes||[];loanSettle(res.notes);rescueCash(res.notes);
+  if(G.cash<0)return gameOver('週結算付不出稅金、利息和貸款，分店也賣光了，阿嬤的老店被法拍了。');
   if(G.week>32&&G.debt>0)return gameOver('32 週期限到了，負債還沒還清，老店被收回。');
   showBetween(res,true);
 }
@@ -1330,6 +1332,8 @@ function showPrep(){
     ${(()=>{const r=G.staff.filter(o=>o!==s).map(o=>[o,relOf(s,o)]).filter(([o,v])=>Math.abs(v)>=30);return r.length?`<div class="small">${r.map(([o,v])=>`${relTag(v).split(' ')[0]} ${o.name}`).join('　')}</div>`:''})()}
     ${s.mood<20?`<div class="neg small">想離職了！<button class="btn sm" data-bonus="${s.id}">發獎金 3,000</button> <button class="btn sm ghost" data-talk="${s.id}">談心</button></div>`:''}
     <div class="row" style="margin-top:4px"><span class="small">下一場</span>${sel(s)}</div>
+    ${s.master?(()=>{const m=G.staff.find(x=>x.id===s.master.id);return m?`<div class="small" style="margin-top:4px">🎓 跟 ${m.name} 學${AB[s.master.key]}（${Math.round(s.abil[s.master.key])}／50）<a href="#" data-unm="${s.id}">解除</a></div>`:''})()
+      :(()=>{const o=mentorOpts(s);return o.length?`<div class="small" style="margin-top:4px">🎓 <select data-mentor="${s.id}"><option value="">拜師學藝…</option>${o.map(x=>`<option value="${x.m.id}|${x.k}">${x.m.name}（${AB[x.k]} ${Math.round(x.v)}）</option>`).join('')}</select></div>`:''})()}
     ${FIRE_ASK===s.id?`<div class="row" style="margin-top:6px;background:#c2412d18;border-radius:6px;padding:4px 6px"><span class="small neg">資遣費 ${fmt(severance(s))}，其他人心情會變差</span><span><button class="btn sm" data-fireok="${s.id}">確定開除</button> <button class="btn sm ghost" data-firecancel="1">算了</button></span></div>`
       :`<div style="text-align:right;margin-top:4px"><button class="btn sm ghost" data-fire="${s.id}" style="color:var(--bad)">開除</button></div>`}</div>`};
   const bossBox=()=>`<div class="box"><div class="row"><b>老闆（你）</b><span class="small">自己走位</span></div><div class="small">親自做哪個崗位，哪項能力就成長</div><div class="small">${Object.entries(G.boss.abil).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div></div>`;
@@ -1379,6 +1383,7 @@ function showPrep(){
       ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
+      ${loanHtml()}
       <h2>還債</h2><div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn sm" data-pay="10000">還 1 萬</button><button class="btn sm" data-pay="50000">還 5 萬</button><button class="btn sm ghost" data-pay="max">能還的全還</button><span class="small">剩 ${fmt(G.debt)}，每週利息 ${fmt(G.debt*DEBT_RATE)}</span></div>
       <p class="small">營業本金 ${fmt(opCap())}（本場薪水＋水電＋週轉金 5,000）：還債、升級、擴店、聘人都不能動到這筆錢。</p>`;
   }
@@ -1390,6 +1395,7 @@ function showPrep(){
   if($('bRival'))$('bRival').onclick=openRivals;
   if($('bAch'))$('bAch').onclick=e=>{e.preventDefault();openAch()};
   if($('bShop'))$('bShop').onclick=openShop;
+  if($('lnGo'))$('lnGo').onclick=()=>{const a=+$('lnAmt').value,w=+$('lnWk').value;if(a>loanLimit())return toast('超過額度');takeLoan(a,w);showPrep()};
   if($('bCuisine'))$('bCuisine').onclick=openCuisine;
   P.querySelectorAll('[data-dlv]').forEach(b=>b.onclick=()=>{const a=b.dataset.dlv;if(a==='join'){if(!capOk(DLV_JOIN))return;G.cash-=DLV_JOIN;G.dlvJoined=true;G.dlvOn=true;toast('加入外送平台了！')}else G.dlvOn=a==='on';showPrep()});
   P.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{const k=b.dataset.promo,c=promoCost(k);if(!capOk(c))return;G.cash-=c;G.promo=(G.promo||[]).concat([{k,left:PROMO[k].left,hi:($('prTgt')||{}).value==='1'}]);toast(PROMO[k].n+' 開始了！');showPrep()});
@@ -1411,6 +1417,8 @@ function showPrep(){
     if(v<=0)return toast(G.debt<=0?'債已經還清了':'現金只剩營業本金，不能再還');
     if(v>room)return toast('還了會低於營業本金 '+fmt(opCap())+'，店就開不了');
     G.cash-=v;G.debt-=v;toast('還了 '+fmt(v));showPrep()});
+  P.querySelectorAll('[data-mentor]').forEach(el=>el.onchange=()=>{if(!el.value)return;const s=G.staff.find(x=>x.id==el.dataset.mentor),[mid,k]=el.value.split('|');s.master={id:+mid,key:k};toast(s.name+' 拜師學'+AB[k]+'！兩人同一場上班就會一起練');showPrep()});
+  P.querySelectorAll('[data-unm]').forEach(a=>a.onclick=e=>{e.preventDefault();const s=G.staff.find(x=>x.id==a.dataset.unm);delete s.master;showPrep()});
   P.querySelectorAll('[data-fire]').forEach(b=>b.onclick=()=>{FIRE_ASK=(G.staff.find(x=>x.id==b.dataset.fire)||{}).id;showPrep()});
   P.querySelectorAll('[data-firecancel]').forEach(b=>b.onclick=()=>{FIRE_ASK=null;showPrep()});
   P.querySelectorAll('[data-fireok]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.fireok);FIRE_ASK=null;if(!s)return showPrep();
@@ -1749,6 +1757,44 @@ function dealView(aid,x,msg=''){
 
 
 
+
+
+/* ---------- 貸款 ---------- */
+const LOAN_T={4:.02,8:.05,12:.09};
+const loanOwe=()=>(G.loans||[]).reduce((a,l)=>a+l.total,0);
+function loanLimit(){const br=(G.branches||[]).reduce((a,b)=>a+(b.own?b.price*.5:b.deposit||0)+30000,0);
+  return Math.max(0,Math.round((50000+br+Math.max(0,stars()-3)*40000+tableN()*5000)/1000)*1000-loanOwe())}
+function takeLoan(amt,wk,auto){G.loans=(G.loans||[]).concat([{amt,wk,due:G.week+wk,total:Math.round(amt*(1+LOAN_T[wk]))}]);G.cash+=amt;if(!auto)toast(`借了 ${fmt(amt)}，第 ${G.week+wk} 週要還 ${fmt(Math.round(amt*(1+LOAN_T[wk])))}`,3.5)}
+// 週結算：到期要還；不夠就賣分店；分店賣光還不夠就破產
+function loanSettle(notes){
+  const due=(G.loans||[]).filter(l=>l.due<=G.week);if(!due.length)return;
+  for(const l of due){G.cash-=l.total;notes.push(`🏦 貸款到期，還了 ${fmt(l.total)}`)}
+  G.loans=G.loans.filter(l=>l.due>G.week);
+}
+function rescueCash(notes){
+  // 1. 先自動借 4 週短期貸款
+  if(G.cash<0){const need=-G.cash+5000,lim=loanLimit();if(lim>=need){takeLoan(Math.ceil(need/1000)*1000,4,true);notes.push(`🏦 現金不夠，自動借了 4 週短期貸款 ${fmt(Math.ceil(need/1000)*1000)}`)}}
+  // 2. 還不夠就變賣分店
+  while(G.cash<0&&(G.branches||[]).length){const b=G.branches.sort((x,y)=>(y.own?y.price*.8:y.deposit)-(x.own?x.price*.8:x.deposit))[0];
+    const v=b.own?Math.round(b.price*.8):b.deposit;G.cash+=v;G.branches=G.branches.filter(x=>x!==b);b.mgr.role='rest';b.mgr.mood=Math.max(1,b.mgr.mood-30);G.staff.push(b.mgr);
+    notes.push(`🏪 現金不夠，賣掉了 ${b.name}（拿回 ${fmt(v)}），店長 ${b.mgr.name} 回老店，心情很差`)}
+}
+function loanHtml(){const L=G.loans||[],lim=loanLimit();
+  return `<h2>🏦 貸款</h2><p class="small">借款額度看你的店、分店和評價。4 週利息 2%、8 週 5%、12 週 9%，到期在週結算自動扣。週結算現金不夠時會自動借短期貸款，再不夠就要變賣分店，分店賣光還不夠就破產。</p>
+   ${L.length?`<div class="small">${L.map(l=>`借 ${fmt(l.amt)}，第 ${l.due} 週要還 ${fmt(l.total)}`).join('<br>')}</div>`:''}
+   <div class="box row" style="flex-wrap:wrap;gap:6px"><span>還能借 <b>${fmt(lim)}</b></span>
+   ${lim>=10000?`<span style="display:flex;gap:6px;flex-wrap:wrap"><select id="lnAmt">${[10000,30000,50000,100000,200000,500000].filter(v=>v<=lim).map(v=>`<option value="${v}">${fmt(v)}</option>`).join('')}</select><select id="lnWk"><option value="4">4 週（2%）</option><option value="8">8 週（5%）</option><option value="12">12 週（9%）</option></select><button class="btn sm" id="lnGo">借錢</button></span>`:'<span class="small">額度不夠</span>'}</div>`}
+
+/* ---------- 師徒 ---------- */
+const topKey=s=>Object.entries(s.abil).sort((a,b)=>b[1]-a[1])[0];
+function mentorOpts(s){return G.staff.filter(m=>m!==s&&!m.master&&topKey(m)[1]>=60&&s.abil[topKey(m)[0]]<50).map(m=>{const [k,v]=topKey(m);return {m,k,v}})}
+// 每場結束：師傅和徒弟都有上班，徒弟那項能力成長加倍（感情好再多一點），師傅比較累；徒弟練到 50 就出師
+function mentorAfterMeal(notes){
+  for(const s of G.staff){if(!s.master)continue;const m=G.staff.find(x=>x.id===s.master.id);if(!m){delete s.master;continue}
+    if(s.role==='rest'||m.role==='rest')continue;const k=s.master.key,n=G.staff.filter(x=>x.master&&x.master.id===m.id).length;
+    const g=2.5*(relOf(s,m)>=60?1.5:1)/Math.pow(2,n-1);s.abil[k]=Math.min(100,s.abil[k]+g);m.stam=Math.max(0,m.stam-5);
+    if(s.abil[k]>=50){notes.push(`🎓 ${s.name} 跟 ${m.name} 學${AB[k]}，出師了！`);s.mood=Math.min(100,s.mood+20);relAdd(s,m,15);delete s.master}}
+}
 
 /* ---------- 成就 ---------- */
 const stt=k=>((G.st||{})[k]||0);
