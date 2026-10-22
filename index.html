@@ -2327,8 +2327,8 @@ function rdStage2(){
    <div class="foot"><button class="btn" id="rdHit" style="font-size:20px;padding:12px 28px">${m.act}</button></div>`);
   let t0=performance.now(),x=0,live=true;
   const tick=()=>{if(!live||!$('rdNeedle'))return;const t=(performance.now()-t0)/1000*m.sp;x=1-Math.abs((t%2)-1);$('rdNeedle').style.left=`calc(${x*100}% - 3px)`;requestAnimationFrame(tick)};tick();
-  $('rdHit').onclick=()=>{live=false;const off=Math.abs(x-zc),v=off<=m.w/2?Math.round(100-off/(m.w/2)*25):Math.max(0,Math.round(70-(off-m.w/2)*300));
-    RD.s2.push(v);if(RD.s2.length<3)return setTimeout(rdStage2,500);
+  $('rdHit').onclick=()=>{if(!live)return;live=false;$('rdHit').disabled=true;const off=Math.abs(x-zc),v=off<=m.w/2?Math.round(100-off/(m.w/2)*25):Math.max(0,Math.round(70-(off-m.w/2)*300));
+    RD.s2.push(v);if(RD.s2.length<3)return setTimeout(()=>{if(RD&&$('rdHit'))rdStage2()},500);
     const avg=Math.round(RD.s2.reduce((a,b)=>a+b,0)/3);RD.s2v=avg;
     showOverlay(rdHead(2)+`<h2>火候節奏</h2><p>${RD.s2.map((v,i)=>'第 '+(i+1)+' 次 '+v+' 分').join('　')}</p><p>平均 <b>${avg}</b></p><div class="foot"><button class="btn" id="rdNext">下一關：評審試吃</button></div>`);
     $('rdNext').onclick=rdStage3};
@@ -2816,6 +2816,14 @@ function frame(ts){
 }
 function drawIdle(){const d=VIEW.d;ctx.setTransform(d,0,0,d,0,0);ctx.fillStyle='#2f4a43';ctx.fillRect(0,0,VIEW.cw,VIEW.ch);label('灶跤人生',VIEW.cw/2,VIEW.ch/2,'#d9a441',40,true)}
 try{$('coinIc').src=ART_SRC.coins}catch(e){}
+// 手機的返回鍵／返回手勢：等於按畫面上的「返回」，不會直接離開遊戲
+function sysBack(){
+  if($('overlay').style.display==='none'){if(R&&!paused&&$('bPause'))$('bPause').click();return}
+  const bs=[...$('panel').querySelectorAll('button')].filter(b=>!b.disabled&&b.offsetParent);
+  const b=bs.find(b=>/(Back|Bk)$/.test(b.id))||bs.find(b=>/^(返回|回|再看看|取消|關閉)/.test(b.textContent.trim()));
+  if(b)b.click();
+}
+try{history.pushState({zk:1},'');addEventListener('popstate',()=>{history.pushState({zk:1},'');sysBack()})}catch(e){}
 newGame();resize();showTitle();requestAnimationFrame(loop);
 })();
 </script>
