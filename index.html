@@ -259,10 +259,120 @@ const DISHES=[
   {id:'vn4',name:'香茅炒雞',short:'香茅',steps:['wok'],req:['meat_cut','sauce'],ref:140,cuisine:'vn'},
   {id:'vn5',name:'法國麵包',short:'法國',steps:['fry','wok'],req:['meat_cut','veg_cut'],ref:90,cuisine:'vn'},
   {id:'vn6',name:'牛肉湯河粉',short:'牛肉',steps:['steam','wok','boil'],req:['meat_cut','rice_wash','veg_cut'],ref:170,cuisine:'vn'},
+  // 神秘菜系（神秘旅人教的）
+  {id:'gong1',name:'佛跳牆',short:'佛跳牆',steps:['steam','boil'],req:['sea_wash','meat_cut','sauce'],ref:680,cuisine:'gong'},
+  {id:'gong2',name:'宮廷燕窩羹',short:'燕窩',steps:['boil'],req:['egg_beat','sauce'],ref:420,cuisine:'gong'},
+  {id:'gong3',name:'金銀蒸餃',short:'金銀餃',steps:['steam'],req:['meat_cut','sea_wash'],ref:260,cuisine:'gong'},
+  {id:'gong4',name:'炸鳳尾蝦',short:'鳳尾蝦',steps:['fry'],req:['sea_wash','egg_beat'],ref:380,cuisine:'gong'},
+  {id:'gong5',name:'宮保干貝',short:'干貝',steps:['wok'],req:['sea_wash','veg_cut','sauce'],ref:450,cuisine:'gong'},
+  {id:'gong6',name:'滿漢小全席',short:'滿漢',steps:['steam','fry','wok','boil'],req:['meat_mar','sea_wash','veg_cut','rice_cooked'],ref:980,cuisine:'gong'},
+  {id:'sea1',name:'龍蝦湯',short:'龍蝦湯',steps:['boil'],req:['sea_wash','sauce'],ref:520,cuisine:'sea'},
+  {id:'sea2',name:'深海炸魚',short:'炸深魚',steps:['fry'],req:['sea_wash','egg_beat'],ref:360,cuisine:'sea'},
+  {id:'sea3',name:'鮑魚蒸蛋',short:'鮑魚蛋',steps:['steam'],req:['egg_beat','sea_wash'],ref:480,cuisine:'sea'},
+  {id:'sea4',name:'海膽炒飯',short:'海膽飯',steps:['wok'],req:['sea_wash','rice_cooked','egg_beat'],ref:420,cuisine:'sea'},
+  {id:'sea5',name:'帝王蟹粥',short:'蟹粥',steps:['boil'],req:['sea_wash','rice_wash'],ref:560,cuisine:'sea'},
+  {id:'sea6',name:'海神宴',short:'海神宴',steps:['steam','fry','boil'],req:['sea_wash','veg_cut','sauce'],ref:880,cuisine:'sea'},
+  {id:'old1',name:'古早味雞捲',short:'雞捲',steps:['fry'],req:['meat_cut','veg_cut'],ref:180,cuisine:'old'},
+  {id:'old2',name:'紅燒鰻',short:'紅燒鰻',steps:['boil'],req:['sea_wash','sauce'],ref:320,cuisine:'old'},
+  {id:'old3',name:'魷魚螺肉蒜',short:'螺肉蒜',steps:['boil'],req:['sea_wash','meat_cut','veg_cut'],ref:520,cuisine:'old'},
+  {id:'old4',name:'八寶芋泥',short:'芋泥',steps:['steam'],req:['rice_wash','sauce'],ref:220,cuisine:'old'},
+  {id:'old5',name:'辦桌炒米粉',short:'米粉',steps:['wok'],req:['rice_wash','veg_cut','meat_cut'],ref:160,cuisine:'old'},
+  {id:'old6',name:'辦桌全席',short:'辦桌',steps:['steam','fry','wok'],req:['meat_mar','sea_wash','rice_cooked'],ref:760,cuisine:'old'},
+  // 在地菜（在該縣市有店才能賣）
+  {id:'lc0_0',name:'鼎邊趖',short:'鼎邊趖',steps:['boil'],req:['sea_wash','rice_wash','sauce'],ref:70,local:'基隆市'},
+  {id:'lc0_1',name:'天婦羅',short:'天婦羅',steps:['fry'],req:['sea_wash'],ref:60,local:'基隆市'},
+  {id:'lc0_2',name:'營養三明治',short:'營養三',steps:['fry'],req:['egg_beat','veg_cut'],ref:55,local:'基隆市'},
+  {id:'lc1_0',name:'胡椒餅',short:'胡椒餅',steps:['fry'],req:['meat_mar','sauce'],ref:55,local:'台北市'},
+  {id:'lc1_1',name:'排骨酥麵',short:'排骨酥',steps:['boil'],req:['meat_mar','rice_wash'],ref:110,local:'台北市'},
+  {id:'lc1_2',name:'藥燉排骨',short:'藥燉排',steps:['boil'],req:['meat_cut','sauce'],ref:100,local:'台北市'},
+  {id:'lc2_0',name:'淡水阿給',short:'水阿給',steps:['steam'],req:['meat_cut','sauce'],ref:60,local:'新北市'},
+  {id:'lc2_1',name:'深坑臭豆腐',short:'臭豆腐',steps:['fry'],req:['veg_cut','sauce'],ref:80,local:'新北市'},
+  {id:'lc2_2',name:'金山鴨肉',short:'山鴨肉',steps:['boil'],req:['meat_cut','sauce'],ref:120,local:'新北市'},
+  {id:'lc3_0',name:'大溪豆干',short:'溪豆干',steps:['boil'],req:['sauce'],ref:50,local:'桃園市'},
+  {id:'lc3_1',name:'客家粄條',short:'家粄條',steps:['boil'],req:['rice_wash','meat_cut','veg_cut'],ref:80,local:'桃園市'},
+  {id:'lc3_2',name:'石門活魚',short:'門活魚',steps:['wok'],req:['sea_wash','sauce'],ref:260,local:'桃園市'},
+  {id:'lc4_0',name:'貢丸湯',short:'貢丸湯',steps:['boil'],req:['meat_cut'],ref:45,local:'新竹市'},
+  {id:'lc4_1',name:'炒米粉',short:'炒米粉',steps:['wok'],req:['rice_wash','veg_cut','meat_cut'],ref:70,local:'新竹市'},
+  {id:'lc4_2',name:'城隍廟潤餅',short:'廟潤餅',steps:['steam'],req:['veg_cut','egg_beat'],ref:55,local:'新竹市'},
+  {id:'lc5_0',name:'客家小炒',short:'家小炒',steps:['wok'],req:['meat_cut','veg_cut','sauce'],ref:150,local:'新竹縣'},
+  {id:'lc5_1',name:'薑絲炒大腸',short:'薑絲炒',steps:['wok'],req:['meat_cut','veg_cut'],ref:140,local:'新竹縣'},
+  {id:'lc5_2',name:'擂茶飯',short:'擂茶飯',steps:['boil'],req:['rice_cooked','veg_wash'],ref:90,local:'新竹縣'},
+  {id:'lc6_0',name:'福菜肉片湯',short:'福菜肉',steps:['boil'],req:['meat_cut','veg_wash'],ref:90,local:'苗栗縣'},
+  {id:'lc6_1',name:'客家鹹湯圓',short:'鹹湯圓',steps:['boil'],req:['rice_wash','meat_cut'],ref:70,local:'苗栗縣'},
+  {id:'lc6_2',name:'大湖草莓鬆餅',short:'莓鬆餅',steps:['fry'],req:['egg_beat'],ref:90,local:'苗栗縣'},
+  {id:'lc7_0',name:'大麵羹',short:'大麵羹',steps:['boil'],req:['rice_wash','veg_cut'],ref:50,local:'台中市'},
+  {id:'lc7_1',name:'排骨酥湯',short:'排骨酥',steps:['boil'],req:['meat_mar','veg_wash'],ref:80,local:'台中市'},
+  {id:'lc7_2',name:'豐原肉圓',short:'原肉圓',steps:['steam'],req:['meat_cut','sauce'],ref:50,local:'台中市'},
+  {id:'lc8_0',name:'彰化肉圓',short:'化肉圓',steps:['fry'],req:['meat_cut','sauce'],ref:55,local:'彰化縣'},
+  {id:'lc8_1',name:'爌肉飯',short:'爌肉飯',steps:['boil'],req:['meat_mar','rice_cooked','sauce'],ref:75,local:'彰化縣'},
+  {id:'lc8_2',name:'鹿港蚵仔煎',short:'蚵仔煎',steps:['wok'],req:['sea_wash','egg_beat'],ref:80,local:'彰化縣'},
+  {id:'lc9_0',name:'埔里米粉',short:'里米粉',steps:['wok'],req:['rice_wash','veg_cut'],ref:70,local:'南投縣'},
+  {id:'lc9_1',name:'竹筒飯',short:'竹筒飯',steps:['steam'],req:['rice_wash','meat_mar'],ref:120,local:'南投縣'},
+  {id:'lc9_2',name:'香菇肉羹',short:'香菇肉',steps:['boil'],req:['meat_cut','veg_wash','sauce'],ref:70,local:'南投縣'},
+  {id:'lc10_0',name:'北港麻油雞',short:'麻油雞',steps:['boil'],req:['meat_cut','sauce'],ref:150,local:'雲林縣'},
+  {id:'lc10_1',name:'西螺滷肉飯',short:'滷肉飯',steps:['boil'],req:['meat_cut','rice_cooked','sauce'],ref:45,local:'雲林縣'},
+  {id:'lc10_2',name:'斗六魷魚羹',short:'魷魚羹',steps:['boil'],req:['sea_wash','sauce'],ref:70,local:'雲林縣'},
+  {id:'lc11_0',name:'火雞肉飯',short:'火雞肉',steps:['steam'],req:['meat_cut','rice_cooked','sauce'],ref:45,local:'嘉義市'},
+  {id:'lc11_1',name:'砂鍋魚頭',short:'砂鍋魚',steps:['boil'],req:['sea_wash','veg_cut','sauce'],ref:280,local:'嘉義市'},
+  {id:'lc11_2',name:'嘉義涼麵',short:'義涼麵',steps:['boil'],req:['rice_wash','egg_beat','sauce'],ref:55,local:'嘉義市'},
+  {id:'lc12_0',name:'東石蚵嗲',short:'石蚵嗲',steps:['fry'],req:['sea_wash','veg_cut'],ref:55,local:'嘉義縣'},
+  {id:'lc12_1',name:'布袋鮮蚵湯',short:'鮮蚵湯',steps:['boil'],req:['sea_wash'],ref:80,local:'嘉義縣'},
+  {id:'lc12_2',name:'鴨肉羹',short:'鴨肉羹',steps:['boil'],req:['meat_cut','sauce'],ref:70,local:'嘉義縣'},
+  {id:'lc13_0',name:'擔仔麵',short:'擔仔麵',steps:['boil'],req:['sea_wash','rice_wash','sauce'],ref:60,local:'台南市'},
+  {id:'lc13_1',name:'虱目魚粥',short:'虱目魚',steps:['boil'],req:['sea_wash','rice_wash'],ref:90,local:'台南市'},
+  {id:'lc13_2',name:'棺材板',short:'棺材板',steps:['fry'],req:['egg_beat','sea_wash','veg_cut'],ref:80,local:'台南市'},
+  {id:'lc14_0',name:'旗津烤小卷',short:'烤小卷',steps:['wok'],req:['sea_wash','sauce'],ref:180,local:'高雄市'},
+  {id:'lc14_1',name:'鹽埕鴨肉飯',short:'鴨肉飯',steps:['steam'],req:['meat_cut','rice_cooked'],ref:70,local:'高雄市'},
+  {id:'lc14_2',name:'岡山羊肉爐',short:'羊肉爐',steps:['boil'],req:['meat_cut','veg_cut','sauce'],ref:260,local:'高雄市'},
+  {id:'lc15_0',name:'萬巒豬腳',short:'巒豬腳',steps:['steam'],req:['meat_mar','sauce'],ref:200,local:'屏東縣'},
+  {id:'lc15_1',name:'櫻花蝦炒飯',short:'櫻花蝦',steps:['wok'],req:['sea_wash','rice_cooked','egg_beat'],ref:120,local:'屏東縣'},
+  {id:'lc15_2',name:'恆春綠豆蒜',short:'綠豆蒜',steps:['boil'],req:['rice_wash'],ref:45,local:'屏東縣'},
+  {id:'lc16_0',name:'宜蘭卜肉',short:'蘭卜肉',steps:['fry'],req:['meat_mar'],ref:90,local:'宜蘭縣'},
+  {id:'lc16_1',name:'糕渣',short:'糕渣',steps:['fry'],req:['meat_cut','egg_beat'],ref:80,local:'宜蘭縣'},
+  {id:'lc16_2',name:'三星蔥油餅',short:'蔥油餅',steps:['fry'],req:['veg_cut','egg_beat'],ref:50,local:'宜蘭縣'},
+  {id:'lc17_0',name:'花蓮扁食',short:'蓮扁食',steps:['boil'],req:['meat_cut'],ref:60,local:'花蓮縣'},
+  {id:'lc17_1',name:'炸彈蔥油餅',short:'炸彈蔥',steps:['fry'],req:['veg_cut','egg_beat'],ref:50,local:'花蓮縣'},
+  {id:'lc17_2',name:'剝皮辣椒雞湯',short:'剝皮辣',steps:['boil'],req:['meat_cut','sauce'],ref:220,local:'花蓮縣'},
+  {id:'lc18_0',name:'池上便當',short:'池上便',steps:['steam'],req:['rice_cooked','meat_cut','veg_cut'],ref:100,local:'台東縣'},
+  {id:'lc18_1',name:'旗魚丸湯',short:'旗魚丸',steps:['boil'],req:['sea_wash'],ref:60,local:'台東縣'},
+  {id:'lc18_2',name:'台東米苔目',short:'米苔目',steps:['boil'],req:['rice_wash','sauce'],ref:50,local:'台東縣'},
+  {id:'lc19_0',name:'小管麵線',short:'小管麵',steps:['boil'],req:['sea_wash','rice_wash'],ref:100,local:'澎湖縣'},
+  {id:'lc19_1',name:'澎湖海鮮粥',short:'海鮮粥',steps:['boil'],req:['sea_wash','rice_wash'],ref:150,local:'澎湖縣'},
+  {id:'lc19_2',name:'炒絲瓜',short:'炒絲瓜',steps:['wok'],req:['veg_cut'],ref:90,local:'澎湖縣'},
+  {id:'lc20_0',name:'金門廣東粥',short:'廣東粥',steps:['boil'],req:['rice_wash','meat_cut','egg_beat'],ref:70,local:'金門縣'},
+  {id:'lc20_1',name:'燒餅夾蛋',short:'燒餅夾',steps:['fry'],req:['egg_beat'],ref:45,local:'金門縣'},
+  {id:'lc20_2',name:'石蚵炒蛋',short:'石蚵炒',steps:['wok'],req:['sea_wash','egg_beat'],ref:150,local:'金門縣'},
+  {id:'lc21_0',name:'繼光餅',short:'繼光餅',steps:['fry'],req:['meat_cut'],ref:45,local:'連江縣'},
+  {id:'lc21_1',name:'老酒麵線',short:'老酒麵',steps:['boil'],req:['rice_wash','egg_beat','sauce'],ref:120,local:'連江縣'},
+  {id:'lc21_2',name:'馬祖魚麵',short:'祖魚麵',steps:['boil'],req:['sea_wash'],ref:110,local:'連江縣'},
   {id:'guabao',name:'刈包',short:'刈包',steps:['steam','wok'],req:['meat_cut','veg_cut','sauce'],ref:70,clue:'五花肉切片滷入味，夾酸菜（切好的菜），先蒸軟刈包再回鍋。'},
 ];
 DISHES.forEach(d=>d.ing=[...new Set(d.req.map(k=>ITEM[k].raw))]);
-const CUISINES={hk:{n:'港式',ic:'🥟'},cn:{n:'中華',ic:'🥢'},jp:{n:'日式',ic:'🍱'},kr:{n:'韓式',ic:'🍲'},it:{n:'義式',ic:'🍝'},us:{n:'美式',ic:'🍔'},fr:{n:'法式',ic:'🥖'},th:{n:'泰式',ic:'🍤'},vn:{n:'越式',ic:'🍜'}};
+const CUISINES={gong:{n:'宮廷御膳',ic:'🏯',myst:1},sea:{n:'深海秘境',ic:'🦞',myst:1},old:{n:'失傳古早味',ic:'🏮',myst:1},hk:{n:'港式',ic:'🥟'},cn:{n:'中華',ic:'🥢'},jp:{n:'日式',ic:'🍱'},kr:{n:'韓式',ic:'🍲'},it:{n:'義式',ic:'🍝'},us:{n:'美式',ic:'🍔'},fr:{n:'法式',ic:'🥖'},th:{n:'泰式',ic:'🍤'},vn:{n:'越式',ic:'🍜'}};
+Object.assign(DISH_IC,{gong1:'🏯',gong2:'🏯',gong3:'🏯',gong4:'🏯',gong5:'🏯',gong6:'🏯',sea1:'🦞',sea2:'🦞',sea3:'🦞',sea4:'🦞',sea5:'🦞',sea6:'🦞',old1:'🏮',old2:'🏮',old3:'🏮',old4:'🏮',old5:'🏮',old6:'🏮'});
+Object.assign(DISH_IC,{lc0_0:'🍲',lc0_1:'🍢',lc0_2:'🥪',lc1_0:'🥟',lc1_1:'🍜',lc1_2:'🍲',lc2_0:'🍢',lc2_1:'🍢',lc2_2:'🦆',lc3_0:'🧈',lc3_1:'🍜',lc3_2:'🐟',lc4_0:'🍲',lc4_1:'🍝',lc4_2:'🌯',lc5_0:'🥘',lc5_1:'🥘',lc5_2:'🍵',lc6_0:'🍲',lc6_1:'🍡',lc6_2:'🍓',lc7_0:'🍜',lc7_1:'🍲',lc7_2:'🥟',lc8_0:'🥟',lc8_1:'🍚',lc8_2:'🥘',lc9_0:'🍝',lc9_1:'🎋',lc9_2:'🍲',lc10_0:'🍗',lc10_1:'🍚',lc10_2:'🍲',lc11_0:'🍚',lc11_1:'🐟',lc11_2:'🍜',lc12_0:'🦪',lc12_1:'🍲',lc12_2:'🦆',lc13_0:'🍜',lc13_1:'🐟',lc13_2:'🍞',lc14_0:'🦑',lc14_1:'🦆',lc14_2:'🍲',lc15_0:'🍖',lc15_1:'🍤',lc15_2:'🫘',lc16_0:'🍖',lc16_1:'🍢',lc16_2:'🥞',lc17_0:'🥟',lc17_1:'🥞',lc17_2:'🍲',lc18_0:'🍱',lc18_1:'🍲',lc18_2:'🍜',lc19_0:'🦑',lc19_1:'🍲',lc19_2:'🥒',lc20_0:'🍲',lc20_1:'🥙',lc20_2:'🦪',lc21_0:'🥯',lc21_1:'🍜',lc21_2:'🐟'});
+const CITIES={'基隆市':{m:0.9,d:['仁愛區','中正區','七堵區'],lat:25.13,lon:121.74,dishes:['lc0_0','lc0_1','lc0_2']},
+  '台北市':{m:1.6,d:['大安區','信義區','中山區','萬華區'],lat:25.04,lon:121.56,dishes:['lc1_0','lc1_1','lc1_2']},
+  '新北市':{m:1.2,d:['板橋區','新莊區','三重區','淡水區'],lat:25.01,lon:121.46,dishes:['lc2_0','lc2_1','lc2_2']},
+  '桃園市':{m:1,d:['中壢區','桃園區','大溪區'],lat:24.99,lon:121.3,dishes:['lc3_0','lc3_1','lc3_2']},
+  '新竹市':{m:1.1,d:['東區','北區','香山區'],lat:24.8,lon:120.97,dishes:['lc4_0','lc4_1','lc4_2']},
+  '新竹縣':{m:0.85,d:['竹北市','關西鎮','北埔鄉'],lat:24.7,lon:121.12,dishes:['lc5_0','lc5_1','lc5_2']},
+  '苗栗縣':{m:0.8,d:['苗栗市','頭份市','公館鄉'],lat:24.56,lon:120.82,dishes:['lc6_0','lc6_1','lc6_2']},
+  '台中市':{m:1.1,d:['西屯區','北區','南屯區','豐原區'],lat:24.15,lon:120.67,dishes:['lc7_0','lc7_1','lc7_2']},
+  '彰化縣':{m:0.85,d:['彰化市','鹿港鎮','員林市'],lat:24.08,lon:120.54,dishes:['lc8_0','lc8_1','lc8_2']},
+  '南投縣':{m:0.75,d:['南投市','埔里鎮','竹山鎮'],lat:23.91,lon:120.68,dishes:['lc9_0','lc9_1','lc9_2']},
+  '雲林縣':{m:0.75,d:['斗六市','虎尾鎮','北港鎮'],lat:23.71,lon:120.43,dishes:['lc10_0','lc10_1','lc10_2']},
+  '嘉義市':{m:0.85,d:['東區','西區'],lat:23.48,lon:120.45,dishes:['lc11_0','lc11_1','lc11_2']},
+  '嘉義縣':{m:0.75,d:['太保市','布袋鎮','東石鄉'],lat:23.45,lon:120.25,dishes:['lc12_0','lc12_1','lc12_2']},
+  '台南市':{m:0.9,d:['中西區','東區','安平區'],lat:22.99,lon:120.2,dishes:['lc13_0','lc13_1','lc13_2']},
+  '高雄市':{m:0.95,d:['苓雅區','左營區','鳳山區','旗津區'],lat:22.63,lon:120.3,dishes:['lc14_0','lc14_1','lc14_2']},
+  '屏東縣':{m:0.7,d:['屏東市','東港鎮','恆春鎮'],lat:22.67,lon:120.49,dishes:['lc15_0','lc15_1','lc15_2']},
+  '宜蘭縣':{m:0.85,d:['宜蘭市','羅東鎮','三星鄉'],lat:24.7,lon:121.74,dishes:['lc16_0','lc16_1','lc16_2']},
+  '花蓮縣':{m:0.8,d:['花蓮市','吉安鄉','玉里鎮'],lat:23.98,lon:121.6,dishes:['lc17_0','lc17_1','lc17_2']},
+  '台東縣':{m:0.7,d:['台東市','池上鄉','成功鎮'],lat:22.76,lon:121.14,dishes:['lc18_0','lc18_1','lc18_2']},
+  '澎湖縣':{m:0.8,d:['馬公市','湖西鄉'],lat:23.57,lon:119.58,dishes:['lc19_0','lc19_1','lc19_2']},
+  '金門縣':{m:0.75,d:['金城鎮','金湖鎮'],lat:24.44,lon:118.32,dishes:['lc20_0','lc20_1','lc20_2']},
+  '連江縣':{m:0.8,d:['南竿鄉','北竿鄉'],lat:26.15,lon:119.95,dishes:['lc21_0','lc21_1','lc21_2']}};
 Object.assign(DISH_IC,{hk1:'🥟',hk2:'🥟',hk3:'🥟',hk4:'🥟',hk5:'🥟',hk6:'🥟',cn1:'🥢',cn2:'🥢',cn3:'🥢',cn4:'🥢',cn5:'🥢',cn6:'🥢',jp1:'🍱',jp2:'🍱',jp3:'🍱',jp4:'🍱',jp5:'🍱',jp6:'🍱',kr1:'🍲',kr2:'🍲',kr3:'🍲',kr4:'🍲',kr5:'🍲',kr6:'🍲',it1:'🍝',it2:'🍝',it3:'🍝',it4:'🍝',it5:'🍝',it6:'🍝',us1:'🍔',us2:'🍔',us3:'🍔',us4:'🍔',us5:'🍔',us6:'🍔',fr1:'🥖',fr2:'🥖',fr3:'🥖',fr4:'🥖',fr5:'🥖',fr6:'🥖',th1:'🍤',th2:'🍤',th3:'🍤',th4:'🍤',th5:'🍤',th6:'🍤',vn1:'🍜',vn2:'🍜',vn3:'🍜',vn4:'🍜',vn5:'🍜',vn6:'🍜'});
 const dishOk=d=>d.steps.every(owned);
 // 合理價：參考價依菜的品質調整（研發品質加成、爐具等級）。定價跟合理價比，太貴客人就不點、甚至不來
@@ -316,7 +426,7 @@ function newGame(){
      bench:{'肉':3,'海鮮':2,'蔬菜':3,'米麵':10,'蛋奶':3,'調味':5},
      stock:{'肉':20,'海鮮':12,'蔬菜':20,'米麵':30,'蛋奶':20,'調味':30},
      prices:Object.fromEntries(DISHES.map(d=>[d.id,d.ref])),
-     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false, rel:{'1-2':50}, known:BASE_DISH.slice(), dishQ:{},
+     today:{served:0,rev:0,dish:{}}, plates:16, menu:['egg','lurou'], pool:[], nid:3, tutorial:true, closedToday:false, rel:{'1-2':50}, known:[...BASE_DISH,...CITIES['台北市'].dishes], home:'台北市', dishQ:{},
      boss:{name:'老闆',abil:abil({prep:35,order:30,serve:30,bus:30,cash:30,deliv:20,steam:25,boil:25,fry:25,wok:25,clean:30,buy:30})},
      staff:[
       {id:1,name:'阿福師',title:'老師傅',traits:['勤勞','慢慢來'],mood:70,stam:90,role:'wok',
@@ -1265,7 +1375,7 @@ function showTitle(){
   $('bBattle').onclick=openBattle;
   $('bCoop').onclick=openCoop;
   $('bCode').onclick=openSaveCode;
-  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];setTables(G.tables||4);if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
+  if(has)$('bLoad').onclick=()=>{try{G=JSON.parse(localStorage.getItem('zaoka'));[G.boss,...G.staff,...G.pool].forEach(p=>{if(p.abil.prep==null)p.abil.prep=ri(15,30)});if(!G.menu)G.menu=['egg'];setTables(G.tables||4);if(!G.rel)G.rel={'1-2':50};if(!G.known)G.known=BASE_DISH.slice();if(!G.home){G.home='台北市';G.known=[...new Set([...G.known,...CITIES['台北市'].dishes])]}DISHES.forEach(d=>{if(G.prices[d.id]==null)G.prices[d.id]=d.ref});if(!G.bench)G.bench=Object.fromEntries(Object.keys(ING).map(k=>[k,0]));if(!G.today)G.today={served:0,rev:0,dish:{}};if(!G.stoves){G.stoves=[...STOVES];G.slots=4}if(!G.ready){G.ready={meat_cut:0,meat_mar:0,sea_wash:0,veg_wash:0,veg_cut:0,rice_wash:0,rice_cooked:4,egg_beat:0,sauce:0};G.mar=[];G.cooker=null;G.pq=45}showPrep()}catch(e){newGame();showPrep()}};
 }
 /* ---------- 存檔碼：換手機、換瀏覽器也能接著玩（不用帳號） ---------- */
 async function packSave(js){const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(new TextEncoder().encode(js));w.close();
@@ -1379,7 +1489,7 @@ function showPrep(){
       <h2>菜系</h2><div class="box row"><span>台式${(G.cuisines||[]).map(k=>'、'+CUISINES[k].n).join('')}</span><button class="btn sm" id="bCuisine">🍜 開新菜系</button></div>
       <h2>裝潢與設備</h2><div class="box row"><span>${Object.keys(DECOR).filter(k=>dl(k)).map(k=>DECOR[k].ic+DECOR[k].n+dl(k)+'級').join('、')||'還沒裝潢'}｜${Object.keys(EQUIP).filter(eq).map(k=>EQUIP[k].ic).join(' ')||'沒有設備'}</span><button class="btn sm" id="bShop">🏠 裝潢與設備</button></div>
       <h2>對手</h2><div class="box row"><span>${(G.rivals||[]).length?G.rivals.map(r=>(r.kind==='nem'?'👑':'')+r.name+' '+Math.round(r.str)+(r.ally?'🤝':'')).join('、'):'目前還沒有對手'}</span><button class="btn sm" id="bRival">⚔ 看對手</button></div>
-      <h2>分店</h2><div class="box row"><span>${(G.branches||[]).length?'目前 '+G.branches.length+' 家分店，昨天合計 '+fmt(G.branches.reduce((a,b)=>a+(b.last?b.last.net:0),0)):'找房仲看店面、派店長，開第一家分店'}</span><button class="btn sm" id="bBranch">🏪 分店管理</button></div>
+      <h2>分店</h2><div class="box row"><span>${(G.branches||[]).length?'目前 '+G.branches.length+' 家分店，昨天合計 '+fmt(G.branches.reduce((a,b)=>a+(b.last?b.last.net:0),0)):'找房仲看店面、派店長，開第一家分店'}</span><span style="display:flex;gap:6px"><button class="btn sm ghost" id="bMap">🗺 地圖</button><button class="btn sm" id="bBranch">🏪 分店管理</button></span></div>
       ${rdHtml()}
       <h2>擴店與爐具</h2><div class="grid">${expandHtml()}</div>
       <h2>爐具升級</h2><div class="grid">${STOVES.filter(owned).map(k=>{const lv=G.stoveLv[k];return `<div class="box row"><span>${ROLES[k]}・${STOVE_NM[lv]}<br><span class="small">速度 ×${STOVE_SPD[lv]}</span></span>${lv<5?`<button class="btn sm" data-up="${k}">升級 ${fmt(STOVE_COST[lv-1])}</button>`:'<span class="small">已頂級</span>'}</div>`}).join('')}</div>
@@ -1392,6 +1502,7 @@ function showPrep(){
   const P=$('panel');
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
   if($('bBranch'))$('bBranch').onclick=openBranches;
+  if($('bMap'))$('bMap').onclick=()=>openMap();
   if($('bRival'))$('bRival').onclick=openRivals;
   if($('bAch'))$('bAch').onclick=e=>{e.preventDefault();openAch()};
   if($('bShop'))$('bShop').onclick=openShop;
@@ -1634,8 +1745,6 @@ function promoHtml(){
 }
 
 /* ---------- 分店・房仲・店長 ---------- */
-const CITIES={'台北市':{m:1.6,d:['大安區','信義區','中山區','萬華區']},'新北市':{m:1.2,d:['板橋區','新莊區','三重區','永和區']},'桃園市':{m:1,d:['中壢區','桃園區','龜山區']},
-  '台中市':{m:1.1,d:['西屯區','北區','南屯區']},'台南市':{m:.85,d:['中西區','東區','安平區']},'高雄市':{m:.95,d:['苓雅區','左營區','鳳山區']}};
 const CROWD={office:{n:'上班族',v:1},family:{n:'家庭',v:1.05},student:{n:'學生',v:.85},tour:{n:'觀光客',v:1.25}};
 const DEFECT={leak:{n:'漏水',d:'每週要多花 3,000 修理'},pipe:{n:'管線老舊',d:'營收 −10%'},smoke:{n:'排煙不良',d:'評價每天慢慢掉'}};
 const AGENTS=[{id:'kai',n:'阿凱',co:'巷口房屋',d:'物件便宜，常有小毛病'},{id:'lin',n:'林小姐',co:'大城不動產',d:'物件多在大城市，租金偏高'},{id:'chen',n:'陳經理',co:'好室地產',d:'人流好的店面多，議價比較硬'}];
@@ -1658,7 +1767,7 @@ function branchDay(){
   const out=[];let sum=0;
   for(const b of (G.branches||[])){
     const m=b.mgr,P=POLICY[b.policy],sk=mgrSkill(m);
-    let rev=b.tables*b.flow*520*CROWD[b.crowd].v*(.7+sk/100)*(.85+b.stars*.06)*P.r*(1-b.rivals*.06)*rnd(.85,1.15);
+    let rev=(1.15)*b.tables*b.flow*520*CROWD[b.crowd].v*(.7+sk/100)*(.85+b.stars*.06)*P.r*(1-b.rivals*.06)*rnd(.85,1.15);
     if(b.defect==='pipe')rev*=.9;
     const crew=b.tables*260, cost=(rev*.35+crew)*P.c+salary(m)*3+(b.own?0:b.rent/7);
     let net=rev-cost, skim=0;
@@ -1687,10 +1796,10 @@ function openBranches(){
   if(!ok)h+=`<div class="box"><b>開分店的條件</b><br>${cond.map(c=>(c[0]?'✅ ':'⬜ ')+c[1]).join('<br>')}</div>`;
   else if(G.branches.length>=5)h+=`<div class="box small">目前最多 5 家分店。</div>`;
   else h+=`<p class="small">找房仲看物件。合作越多次，房仲越願意推好物件，也會主動告訴你隱藏的毛病。</p><div class="grid">${AGENTS.map(a=>`<div class="box"><b>${a.n}</b>　<span class="small">${a.co}</span><br><span class="small">${a.d}</span><br><span class="small">好感度 ${agentLike(a.id)}</span><br><button class="btn sm" data-agent="${a.id}" style="margin-top:4px">找他看物件</button></div>`).join('')}</div>`;
-  h+=`<div class="foot"><button class="btn" id="brBack">回到準備畫面</button></div>`;
+  h+=`<div class="foot"><button class="btn ghost" id="brMap">🗺 全台地圖</button><button class="btn" id="brBack">回到準備畫面</button></div>`;
   showOverlay(h,'branch');
   const P=$('panel');
-  $('brBack').onclick=showPrep;
+  $('brBack').onclick=showPrep;$('brMap').onclick=()=>openMap(openBranches);
   P.querySelectorAll('[data-pol]').forEach(el=>el.onchange=()=>{const b=G.branches.find(x=>x.id===el.dataset.pol);b.policy=el.value;toast(b.name+' 方針改成「'+POLICY[el.value].n+'」');openBranches()});
   P.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{const b=G.branches.find(x=>x.id===el.dataset.recall);
     if(!el.dataset.sure){el.dataset.sure=1;el.textContent='確定收掉？';return}
@@ -1748,7 +1857,7 @@ function dealView(aid,x,msg=''){
       deposit:buy?0:agreed*8,rivals:x.rivals,defect:x.defect,found:x.known,mgr:c.s,policy:$('dlPol').value,stars:3,last:null};
     G.branches=G.branches||[];G.branches.push(b);addLike(aid,10);
     G.listings[aid].items=G.listings[aid].items.filter(y=>y!==x);save();
-    toast('🎉 '+b.name+' 開幕！店長是 '+c.s.name,3.5);openBranches();
+    toast('🎉 '+b.name+' 開幕！店長是 '+c.s.name,3.5);unlockLocal(b.city);openBranches();
   };
 }
 
@@ -1818,7 +1927,7 @@ const ACH=[
  {id:'karen5',cat:'挑戰',n:'奧客剋星',d:'處理好 5 位奧客',rw:8000,ok:()=>stt('karen')>=5},
  {id:'reg10',cat:'挑戰',n:'人情味',d:'同時有 10 位熟客',rw:10000,ok:()=>(G.regulars||[]).length>=10},
  {id:'recipe',cat:'挑戰',n:'阿嬤的味道',d:'集滿 4 頁秘傳食譜',rw:20000,ok:()=>((G.story||{}).pages||0)>=4},
- {id:'rd6',cat:'挑戰',n:'研發狂人',d:'研發出 6 道台式新菜',rw:15000,ok:()=>DISHES.filter(d=>!BASE_DISH.includes(d.id)&&!d.story&&!d.cuisine&&known(d.id)).length>=6},
+ {id:'rd6',cat:'挑戰',n:'研發狂人',d:'研發出 6 道台式新菜',rw:15000,ok:()=>DISHES.filter(d=>!BASE_DISH.includes(d.id)&&!d.story&&!d.cuisine&&!d.local&&known(d.id)).length>=6},
  // 收集
  {id:'hid3',cat:'收集',n:'臥虎藏龍',d:'聘到 3 位隱藏員工',rw:10000,ok:()=>G.staff.filter(s=>s.hid).length>=3},
  {id:'decor',cat:'收集',n:'四種風情',d:'四種裝潢都至少 1 級',rw:10000,ok:()=>Object.keys(DECOR).every(k=>dl(k)>=1)},
@@ -1837,11 +1946,11 @@ function checkAch(m){
   got.forEach((a,i)=>setTimeout(()=>toast('🏆 成就達成：'+a.n+(a.rw>1?'（+'+fmt(a.rw)+'）':''),3.5),i*1800));
   return got;
 }
-function cuisineCost(){return [80000,150000,250000,400000][Math.min(3,(G.cuisines||[]).length)]+((G.cuisines||[]).length>3?((G.cuisines||[]).length-3)*150000:0)}
+function cuisineCost(){const n=(G.cuisines||[]).filter(k=>!CUISINES[k].myst).length;return [80000,150000,250000,400000][Math.min(3,n)]+(n>3?(n-3)*150000:0)}
 function openCuisine(){
   const own=G.cuisines||[];
   let h=`<h1>🍜 菜系</h1><p class="small">台式之外，可以再開別的菜系。開了之後該菜系 6 道菜馬上可以加進菜單（還是要有對應的爐具）。菜系越多，菜單越有變化，但要備的料也越雜。</p><div class="grid">`;
-  for(const [k,C] of Object.entries(CUISINES)){const ds=DISHES.filter(d=>d.cuisine===k),has=own.includes(k);
+  for(const [k,C] of Object.entries(CUISINES)){if(C.myst&&!own.includes(k)){h+=`<div class="box" style="opacity:.6"><b>❓ 神秘菜系</b><div class="small">買不到。聽說有一位神秘旅人，每年中秋會出現……</div></div>`;continue}const ds=DISHES.filter(d=>d.cuisine===k),has=own.includes(k);
     h+=`<div class="box" style="${has?'border:2px solid var(--gold)':''}"><b>${C.ic} ${C.n}料理</b>${has?' <span class="small pos">✔ 已開</span>':''}
       <div class="small">${ds.map(d=>`${d.name}（${d.steps.map(s=>ROLES[s]).join('→')}・$${d.ref}）`).join('、')}</div>
       ${has?'':`<button class="btn sm" data-cu="${k}" style="margin-top:6px">開${C.n} ${fmt(cuisineCost())}</button>`}</div>`}
@@ -1849,6 +1958,28 @@ function openCuisine(){
   $('panel').querySelectorAll('[data-cu]').forEach(b=>b.onclick=()=>{const k=b.dataset.cu,c=cuisineCost();if(!capOk(c))return;G.cash-=c;
     G.cuisines=[...own,k];const ids=DISHES.filter(d=>d.cuisine===k).map(d=>d.id);G.known=[...new Set([...(G.known||BASE_DISH),...ids])];ids.forEach(id=>{if(G.prices[id]==null)G.prices[id]=DMAP[id].ref});
     toast('🎉 開了'+CUISINES[k].n+'料理！到菜單勾選要賣的菜',3.5);save();openCuisine()});
+}
+function unlockLocal(city){const C=CITIES[city];if(!C)return;const nw=C.dishes.filter(id=>!known(id));if(!nw.length)return;
+  G.known=[...(G.known||BASE_DISH),...nw];nw.forEach(id=>{if(G.prices[id]==null)G.prices[id]=DMAP[id].ref});
+  setTimeout(()=>toast('📍 在'+city+'有店了，可以賣在地菜：'+nw.map(id=>DMAP[id].name).join('、'),4),1500)}
+// 全台地圖：縣市、分店、在地菜
+function openMap(back){
+  const X=lon=>(lon-118.1)*92, Y=lat=>(26.4-lat)*100;
+  const OUT=[[25.30,121.54],[25.13,121.92],[24.85,121.83],[24.60,121.86],[24.10,121.65],[23.50,121.50],[23.00,121.37],[22.75,121.17],[22.35,120.90],[21.90,120.85],[22.00,120.70],[22.35,120.60],[22.55,120.42],[22.90,120.15],[23.40,120.10],[23.80,120.22],[24.20,120.48],[24.60,120.72],[24.90,121.00],[25.10,121.20],[25.25,121.40]];
+  const isl=[[23.57,119.58,.18],[24.44,118.32,.12],[26.15,119.95,.08]];
+  const brs=G.branches||[];
+  const LO={'台北市':[-6,-12],'新北市':[14,14],'基隆市':[10,-6],'桃園市':[-10,0],'新竹市':[-10,2],'新竹縣':[10,8],'苗栗縣':[-10,4],'台中市':[12,0],'彰化縣':[-10,6],'南投縣':[10,6],'雲林縣':[-10,4],'嘉義市':[10,4],'嘉義縣':[-10,8],'台南市':[-10,4],'高雄市':[-10,8],'屏東縣':[10,6]};
+  let svg=`<svg viewBox="0 0 400 470" style="width:100%;max-width:420px;background:#cfe3ea;border-radius:12px"><polygon points="${OUT.map(([a,o])=>X(o)+','+Y(a)).join(' ')}" fill="#e7dfcf" stroke="#6b5d50" stroke-width="2"/>${isl.map(([a,o,r])=>`<ellipse cx="${X(o)}" cy="${Y(a)}" rx="${r*80}" ry="${r*60}" fill="#e7dfcf" stroke="#6b5d50"/>`).join('')}`;
+  for(const [c,C] of Object.entries(CITIES)){const n=brs.filter(b=>b.city===c).length,home=c===G.home;
+    svg+=`<g data-city="${c}" style="cursor:pointer"><circle cx="${X(C.lon)}" cy="${Y(C.lat)}" r="${home?9:n?8:5}" fill="${home?'#c2412d':n?'#d9a441':'#2f4a43'}" stroke="#fff" stroke-width="2"/>
+      <text x="${X(C.lon)+(LO[c]||[10,4])[0]}" y="${Y(C.lat)+(LO[c]||[10,4])[1]}" text-anchor="${(LO[c]||[10])[0]<0?'end':'start'}" font-size="11" fill="#2a2420" font-weight="700">${/^(新竹|嘉義)/.test(c)?c:c.replace(/[市縣]$/,'')}${n?' ×'+n:''}</text></g>`}
+  svg+='</svg>';
+  showOverlay(`<h1>🗺 全台地圖</h1><p class="small">🔴 老店　🟡 有分店　⚫ 還沒去。每個縣市有 3 道在地菜，在那裡有店才能賣。點縣市看在地菜。</p>
+   <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:260px">${svg}</div><div id="mapInfo" style="flex:1;min-width:220px" class="box small">點地圖上的縣市</div></div>
+   <div class="foot"><button class="btn" id="mapBack">返回</button></div>`,'map');
+  $('mapBack').onclick=back||showPrep;
+  document.querySelectorAll('[data-city]').forEach(g=>g.onclick=()=>{const c=g.dataset.city,C=CITIES[c],bs=brs.filter(b=>b.city===c);
+    $('mapInfo').innerHTML=`<b style="font-size:16px">${c}</b>${c===G.home?'（老店）':''}<br>租金水準 ×${C.m}｜${C.d.join('、')}<br><br><b>在地菜</b><br>${C.dishes.map(id=>`${DISH_IC[id]} ${DMAP[id].name}（${DMAP[id].steps.map(x=>ROLES[x]).join('→')}・$${DMAP[id].ref}）${known(id)?' <span class="pos">✔</span>':''}`).join('<br>')}<br><br>${bs.length?'分店：'+bs.map(b=>b.name).join('、'):c===G.home?'':'還沒有分店'}`});
 }
 function openAch(back){
   G.ach=G.ach||{};const n=ACH.filter(a=>G.ach[a.id]).length;
@@ -2020,12 +2151,12 @@ const HIDDEN={
 function hiddenStaff(id){const H=HIDDEN[id];return {id:G.nid++,hid:id,name:H.name,title:H.title,traits:H.traits.slice(),mood:85,stam:100,role:'rest',abil:abil(H.base)}}
 const hasHidden=id=>G.staff.some(s=>s.hid===id);
 function offerHidden(id){G.story=G.story||{pages:0};G.story.met=G.story.met||{};if(G.story.met[id])return false;G.story.met[id]=1;G.pool.unshift(hiddenStaff(id));return true}
-const PORT={fu:'chef',xy:'waitress',boss:'chef',wen:'cust3',jie:'cust1',old:'cust4'};
-const PNAME={fu:'阿福師',xy:'秀玉姨',boss:'你',wen:'小雯',jie:'阿傑',old:'陳伯（熟客）'};
+const PORT={fu:'chef',xy:'waitress',boss:'chef',wen:'cust3',jie:'cust1',old:'cust4',trav:'cust2'};
+const PNAME={fu:'阿福師',xy:'秀玉姨',boss:'你',wen:'小雯',jie:'阿傑',old:'陳伯（熟客）',trav:'斗笠旅人'};
 function scene(title,lines,done){let i=0;
   const show=()=>{const [who,txt]=lines[i];showOverlay(`<h1>${title}</h1><div class="box" style="display:flex;gap:12px;align-items:center;font-size:16px;line-height:1.7"><img alt="" src="${ART_SRC[PORT[who]]}" style="width:64px;flex:0 0 auto"><span><b style="color:var(--red)">${PNAME[who]}</b><br>${txt}</span></div>
     <div class="foot"><span class="small">${i+1}／${lines.length}</span><button class="btn" id="scNext">${i<lines.length-1?'下一句':'好'}</button></div>`);
-    $('scNext').onclick=()=>{i++;if(i<lines.length)show();else done()}};show()}
+    $('scNext').onclick=()=>{if(i>=lines.length)return;i++;if(i<lines.length)show();else done()}};show()}
 function recipePage(){G.story.pages++;G.dishQ=G.dishQ||{};G.dishQ.lurou=(G.dishQ.lurou||0)+5;
   if(G.story.pages>=4&&!known('secret')){G.known=[...(G.known||BASE_DISH),'secret'];G.prices.secret=G.prices.secret||DMAP.secret.ref;G.dishQ.secret=15}}
 const STORY=[
@@ -2050,6 +2181,13 @@ const STORY=[
 function storyEvent(next){
   G.story=G.story||{pages:0};
   const s=STORY.find(x=>x.ok());if(s)return s.run(next);
+  // 神秘旅人：每年中秋一定來，平常極少見
+  {const lock=Object.keys(CUISINES).filter(k=>CUISINES[k].myst&&!(G.cuisines||[]).includes(k));
+   if(lock.length&&G.week>=3&&(yday()===78||Math.random()<.008)){const k=pick(lock),C=CUISINES[k];
+     return scene('🌕 神秘旅人',[['trav','（一位背著斗笠的旅人推門進來，點了一碗滷肉飯，吃得很慢。）'],['trav','「好久沒吃到這個味道了……你阿嬤，是我年輕時的朋友。」'],
+       ['trav',`「這個送你。」（他留下一本泛黃的食譜：《${C.n}》）`],['boss','等一下！請問您是……'],['trav','（門口的風鈴響了一下，人已經不見了。）']],
+       ()=>{if((G.cuisines||[]).includes(k))return;G.cuisines=[...(G.cuisines||[]),k];const ids=DISHES.filter(d=>d.cuisine===k).map(d=>d.id);G.known=[...new Set([...(G.known||BASE_DISH),...ids])];ids.forEach(id=>{if(G.prices[id]==null)G.prices[id]=DMAP[id].ref});
+         toast('🎉 學會神秘菜系「'+C.n+'」！6 道菜可以加進菜單',4);next()})}}
   // 隨機路人
   G.story.met=G.story.met||{};
   if(!G.story.met.ming&&G.day>=10&&Math.random()<.04&&offerHidden('ming'))toast('有個自稱「洗碗大俠」的人在招募區等你…',3.5);
@@ -2149,7 +2287,7 @@ const RD_MODE={wok:{n:'炒',act:'翻鍋！',tip:'鍋氣要夠：指針跑到綠�
   steam:{n:'蒸',act:'掀蓋！',tip:'控火：蒸氣冒到綠色區時掀蓋。',sp:.8,w:.2}};
 let RD=null;
 function rdHtml(){
-  const done=G.rdDay===G.day, cands=DISHES.filter(d=>!known(d.id)&&!d.story&&!d.cuisine), redo=DISHES.filter(d=>known(d.id)&&!d.cuisine&&!d.story);
+  const done=G.rdDay===G.day, cands=DISHES.filter(d=>!known(d.id)&&!d.story&&!d.cuisine&&!d.local), redo=DISHES.filter(d=>known(d.id)&&!d.cuisine&&!d.story&&!d.local);
   const box=(d,again)=>{const q=(G.dishQ||{})[d.id];return `<div class="box"><div class="row"><b>${DISH_IC[d.id]||'🍽'} ${d.name}</b><span class="small">${d.steps.map(s=>ROLES[s]).join('→')}</span></div>
     <div class="small">${again?`目前品質加成 ${q?(q>0?'+':'')+q:'0'}`:'參考售價 $'+d.ref}｜試做材料 ${fmt(rdCost(d))}${dishOk(d)?'':'<br><span class="neg">研發成功後，要有'+d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]).join('、')+'才能賣</span>'}</div>
     <button class="btn sm${again?' ghost':''}" data-rd="${d.id}" ${done?'disabled':''} style="margin-top:4px">${again?'重新研發':'開始研發'}</button></div>`};
