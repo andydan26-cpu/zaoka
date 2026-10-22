@@ -1398,6 +1398,7 @@ async function openSaveCode(){
     try{const js=await unpackSave(v),g=JSON.parse(js);if(!g||!g.day||!g.staff)throw 0;localStorage.setItem('zaoka',js);toast('讀取成功！');showTitle();setTimeout(()=>{const b=$('bLoad');if(b)b.click()},50)}
     catch(e){toast('存檔碼不正確，請確認有完整複製',3)}};
 }
+function isDev(){try{const q=new URLSearchParams(location.search).get('dev');if(q==='andy0980')localStorage.setItem('zaokaDev','1');if(q==='off')localStorage.removeItem('zaokaDev');return localStorage.getItem('zaokaDev')==='1'}catch(e){return false}}
 function save(){try{localStorage.setItem('zaoka',JSON.stringify(G,(k,v)=>k==='rt'||k==='mealStart'?undefined:v))}catch(e){}}
 
 function showBetween(res,dayOver){
@@ -1503,6 +1504,8 @@ function showPrep(){
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
   if($('bBranch'))$('bBranch').onclick=openBranches;
   if($('bMap'))$('bMap').onclick=()=>openMap();
+  if(isDev()){const pn=$('panel'),d=document.createElement('div');d.className='foot';d.innerHTML='<button class="btn ghost" id="devCash" style="border-style:dashed">🛠 老闆專用：+100 萬</button>';pn.appendChild(d);
+    $('devCash').onclick=()=>{G.cash+=1000000;save();toast('💰 現金 +1,000,000',2);showPrep()}}
   if($('bRival'))$('bRival').onclick=openRivals;
   if($('bAch'))$('bAch').onclick=e=>{e.preventDefault();openAch()};
   if($('bShop'))$('bShop').onclick=openShop;
