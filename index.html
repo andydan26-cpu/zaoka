@@ -1970,7 +1970,7 @@ const ACH=[
  // 收集
  {id:'hid3',cat:'收集',n:'臥虎藏龍',d:'聘到 3 位隱藏員工',rw:10000,ok:()=>G.staff.filter(s=>s.hid).length>=3},
  {id:'decor',cat:'收集',n:'四種風情',d:'四種裝潢都至少 1 級',rw:10000,ok:()=>Object.keys(DECOR).every(k=>dl(k)>=1)},
- {id:'equip',cat:'收集',n:'設備齊全',d:'八種設備都有',rw:15000,ok:()=>Object.keys(EQUIP).every(eq)},
+ {id:'equip',cat:'收集',n:'設備齊全',d:'十二種設備都有',rw:15000,ok:()=>Object.keys(EQUIP).every(eq)},
  // 搞笑（隱藏）
  {id:'crazy',cat:'搞笑',hid:1,n:'老闆你認真的嗎',d:'把一道菜定價到 999 元以上',rw:1,ok:()=>Object.values(G.prices||{}).some(v=>v>=999)},
  {id:'empty',cat:'搞笑',hid:1,n:'門可羅雀',d:'一整場一個客人都沒有',rw:500,ok:m=>m&&m.served===0&&!m.lost&&!m.angry&&!m.dlv},
