@@ -204,9 +204,66 @@ const DISHES=[
   {id:'sanbei',name:'三杯雞',short:'三杯',steps:['wok'],req:['meat_cut','veg_cut','sauce'],ref:110,clue:'雞肉切塊，九層塔切好，加三杯醬大火快炒。'},
   {id:'niurou',name:'紅燒牛肉麵',short:'牛肉麵',steps:['boil'],req:['meat_cut','veg_cut','sauce','rice_cooked'],ref:140,clue:'牛肉切塊、青菜切段，用醬汁燉到軟爛，麵條（米麵類，先煮熟）另外下。'},
   {id:'secret',name:'阿嬤秘傳滷肉飯',short:'秘傳',steps:['boil'],req:['meat_cut','rice_cooked','sauce'],ref:120,story:1,clue:''},
+  // 其他菜系（解鎖菜系後才會出現）
+  {id:'hk1',name:'蝦餃',short:'蝦餃',steps:['steam'],req:['sea_wash','veg_cut'],ref:75,cuisine:'hk'},
+  {id:'hk2',name:'叉燒包',short:'叉燒包',steps:['steam'],req:['meat_mar','sauce'],ref:60,cuisine:'hk'},
+  {id:'hk3',name:'炸春捲',short:'炸春捲',steps:['fry'],req:['veg_cut','meat_cut'],ref:65,cuisine:'hk'},
+  {id:'hk4',name:'乾炒牛河',short:'乾炒',steps:['wok'],req:['meat_cut','veg_cut','sauce'],ref:110,cuisine:'hk'},
+  {id:'hk5',name:'皮蛋瘦肉粥',short:'皮蛋',steps:['boil'],req:['rice_wash','meat_cut','egg_beat'],ref:70,cuisine:'hk'},
+  {id:'hk6',name:'燒賣套餐',short:'燒賣',steps:['steam','fry','boil'],req:['meat_cut','sea_wash','rice_cooked'],ref:160,cuisine:'hk'},
+  {id:'cn1',name:'酸辣湯',short:'酸辣湯',steps:['boil'],req:['egg_beat','veg_cut','sauce'],ref:60,cuisine:'cn'},
+  {id:'cn2',name:'糖醋排骨',short:'糖醋',steps:['fry'],req:['meat_mar','sauce'],ref:120,cuisine:'cn'},
+  {id:'cn3',name:'小籠包',short:'小籠包',steps:['steam'],req:['meat_cut','sauce'],ref:90,cuisine:'cn'},
+  {id:'cn4',name:'宮保雞丁',short:'宮保',steps:['wok'],req:['meat_cut','veg_cut','sauce'],ref:110,cuisine:'cn'},
+  {id:'cn5',name:'麻婆豆腐',short:'麻婆',steps:['boil','wok'],req:['meat_cut','sauce','rice_cooked'],ref:100,cuisine:'cn'},
+  {id:'cn6',name:'北京烤鴨套餐',short:'北京',steps:['steam','fry','wok'],req:['meat_mar','veg_cut','sauce'],ref:220,cuisine:'cn'},
+  {id:'jp1',name:'味噌湯',short:'味噌湯',steps:['boil'],req:['veg_wash','sauce'],ref:40,cuisine:'jp'},
+  {id:'jp2',name:'炸豬排',short:'炸豬排',steps:['fry'],req:['meat_mar','egg_beat'],ref:140,cuisine:'jp'},
+  {id:'jp3',name:'茶碗蒸',short:'茶碗蒸',steps:['steam'],req:['egg_beat','sea_wash'],ref:60,cuisine:'jp'},
+  {id:'jp4',name:'野菜炒麵',short:'野菜',steps:['wok'],req:['veg_cut','sauce'],ref:90,cuisine:'jp'},
+  {id:'jp5',name:'親子丼',short:'親子丼',steps:['boil','wok'],req:['meat_cut','egg_beat','rice_cooked'],ref:120,cuisine:'jp'},
+  {id:'jp6',name:'天婦羅定食',short:'天婦',steps:['fry','steam','boil'],req:['sea_wash','veg_cut','rice_cooked'],ref:200,cuisine:'jp'},
+  {id:'kr1',name:'豆腐鍋',short:'豆腐鍋',steps:['boil'],req:['sea_wash','sauce'],ref:120,cuisine:'kr'},
+  {id:'kr2',name:'韓式炸雞',short:'韓式',steps:['fry'],req:['meat_mar','sauce'],ref:150,cuisine:'kr'},
+  {id:'kr3',name:'雞蛋蒸蛋',short:'雞蛋',steps:['steam'],req:['egg_beat'],ref:50,cuisine:'kr'},
+  {id:'kr4',name:'辣炒年糕',short:'辣炒',steps:['wok'],req:['rice_wash','sauce'],ref:90,cuisine:'kr'},
+  {id:'kr5',name:'石鍋拌飯',short:'石鍋',steps:['wok','boil'],req:['rice_cooked','veg_cut','egg_beat'],ref:130,cuisine:'kr'},
+  {id:'kr6',name:'部隊鍋',short:'部隊鍋',steps:['fry','steam','boil'],req:['meat_cut','veg_cut','sauce'],ref:220,cuisine:'kr'},
+  {id:'it1',name:'番茄濃湯',short:'番茄',steps:['boil'],req:['veg_cut','sauce'],ref:70,cuisine:'it'},
+  {id:'it2',name:'炸花枝圈',short:'炸花',steps:['fry'],req:['sea_wash','egg_beat'],ref:120,cuisine:'it'},
+  {id:'it3',name:'清蒸淡菜',short:'清蒸',steps:['steam'],req:['sea_wash','sauce'],ref:150,cuisine:'it'},
+  {id:'it4',name:'蒜香義大利麵',short:'蒜香',steps:['wok'],req:['rice_wash','sauce'],ref:160,cuisine:'it'},
+  {id:'it5',name:'奶油燉飯',short:'奶油',steps:['boil','wok'],req:['rice_wash','egg_beat','sauce'],ref:180,cuisine:'it'},
+  {id:'it6',name:'千層麵',short:'千層麵',steps:['boil','wok','steam'],req:['meat_cut','egg_beat','sauce'],ref:220,cuisine:'it'},
+  {id:'us1',name:'玉米濃湯',short:'玉米',steps:['boil'],req:['veg_wash','egg_beat'],ref:60,cuisine:'us'},
+  {id:'us2',name:'薯條',short:'薯條',steps:['fry'],req:['veg_cut'],ref:60,cuisine:'us'},
+  {id:'us3',name:'蒸玉米',short:'蒸玉米',steps:['steam'],req:['veg_wash'],ref:50,cuisine:'us'},
+  {id:'us4',name:'炒蛋早餐盤',short:'炒蛋',steps:['wok'],req:['egg_beat','meat_cut'],ref:120,cuisine:'us'},
+  {id:'us5',name:'炸雞堡',short:'炸雞堡',steps:['fry','wok'],req:['meat_mar','veg_cut'],ref:140,cuisine:'us'},
+  {id:'us6',name:'牛肉起司漢堡',short:'牛肉',steps:['wok','steam','fry'],req:['meat_cut','veg_cut','egg_beat'],ref:200,cuisine:'us'},
+  {id:'fr1',name:'洋蔥湯',short:'洋蔥湯',steps:['boil'],req:['veg_cut','sauce'],ref:120,cuisine:'fr'},
+  {id:'fr2',name:'可樂餅',short:'可樂餅',steps:['fry'],req:['meat_cut','egg_beat'],ref:80,cuisine:'fr'},
+  {id:'fr3',name:'法式蒸魚',short:'法式',steps:['steam'],req:['sea_wash','sauce'],ref:260,cuisine:'fr'},
+  {id:'fr4',name:'奶油嫩煎干貝',short:'奶油',steps:['wok'],req:['sea_wash','egg_beat'],ref:320,cuisine:'fr'},
+  {id:'fr5',name:'紅酒燉牛肉',short:'紅酒',steps:['wok','boil'],req:['meat_cut','veg_cut','sauce'],ref:380,cuisine:'fr'},
+  {id:'fr6',name:'油封鴨腿',short:'油封',steps:['boil','steam','fry'],req:['meat_mar','sauce'],ref:420,cuisine:'fr'},
+  {id:'th1',name:'冬蔭功湯',short:'冬蔭',steps:['boil'],req:['sea_wash','sauce'],ref:150,cuisine:'th'},
+  {id:'th2',name:'月亮蝦餅',short:'月亮',steps:['fry'],req:['sea_wash','egg_beat'],ref:220,cuisine:'th'},
+  {id:'th3',name:'檸檬蒸魚',short:'檸檬',steps:['steam'],req:['sea_wash','veg_cut'],ref:380,cuisine:'th'},
+  {id:'th4',name:'打拋豬',short:'打拋豬',steps:['wok'],req:['meat_cut','rice_cooked','sauce'],ref:130,cuisine:'th'},
+  {id:'th5',name:'綠咖哩雞',short:'綠咖',steps:['wok','boil'],req:['meat_cut','veg_cut','sauce'],ref:160,cuisine:'th'},
+  {id:'th6',name:'泰式炒河粉',short:'泰式',steps:['boil','fry','wok'],req:['rice_wash','egg_beat','sea_wash'],ref:170,cuisine:'th'},
+  {id:'vn1',name:'越南河粉',short:'越南',steps:['boil'],req:['meat_cut','veg_wash','rice_wash'],ref:130,cuisine:'vn'},
+  {id:'vn2',name:'炸蝦餅',short:'炸蝦餅',steps:['fry'],req:['sea_wash'],ref:120,cuisine:'vn'},
+  {id:'vn3',name:'蒸粉捲',short:'蒸粉捲',steps:['steam'],req:['rice_wash','meat_cut'],ref:90,cuisine:'vn'},
+  {id:'vn4',name:'香茅炒雞',short:'香茅',steps:['wok'],req:['meat_cut','sauce'],ref:140,cuisine:'vn'},
+  {id:'vn5',name:'法國麵包',short:'法國',steps:['fry','wok'],req:['meat_cut','veg_cut'],ref:90,cuisine:'vn'},
+  {id:'vn6',name:'牛肉湯河粉',short:'牛肉',steps:['steam','wok','boil'],req:['meat_cut','rice_wash','veg_cut'],ref:170,cuisine:'vn'},
   {id:'guabao',name:'刈包',short:'刈包',steps:['steam','wok'],req:['meat_cut','veg_cut','sauce'],ref:70,clue:'五花肉切片滷入味，夾酸菜（切好的菜），先蒸軟刈包再回鍋。'},
 ];
 DISHES.forEach(d=>d.ing=[...new Set(d.req.map(k=>ITEM[k].raw))]);
+const CUISINES={hk:{n:'港式',ic:'🥟'},cn:{n:'中華',ic:'🥢'},jp:{n:'日式',ic:'🍱'},kr:{n:'韓式',ic:'🍲'},it:{n:'義式',ic:'🍝'},us:{n:'美式',ic:'🍔'},fr:{n:'法式',ic:'🥖'},th:{n:'泰式',ic:'🍤'},vn:{n:'越式',ic:'🍜'}};
+Object.assign(DISH_IC,{hk1:'🥟',hk2:'🥟',hk3:'🥟',hk4:'🥟',hk5:'🥟',hk6:'🥟',cn1:'🥢',cn2:'🥢',cn3:'🥢',cn4:'🥢',cn5:'🥢',cn6:'🥢',jp1:'🍱',jp2:'🍱',jp3:'🍱',jp4:'🍱',jp5:'🍱',jp6:'🍱',kr1:'🍲',kr2:'🍲',kr3:'🍲',kr4:'🍲',kr5:'🍲',kr6:'🍲',it1:'🍝',it2:'🍝',it3:'🍝',it4:'🍝',it5:'🍝',it6:'🍝',us1:'🍔',us2:'🍔',us3:'🍔',us4:'🍔',us5:'🍔',us6:'🍔',fr1:'🥖',fr2:'🥖',fr3:'🥖',fr4:'🥖',fr5:'🥖',fr6:'🥖',th1:'🍤',th2:'🍤',th3:'🍤',th4:'🍤',th5:'🍤',th6:'🍤',vn1:'🍜',vn2:'🍜',vn3:'🍜',vn4:'🍜',vn5:'🍜',vn6:'🍜'});
 const dishOk=d=>d.steps.every(owned);
 // 合理價：參考價依菜的品質調整（研發品質加成、爐具等級）。定價跟合理價比，太貴客人就不點、甚至不來
 function fairPrice(d){const q=((G.dishQ||{})[d.id]||0)+d.steps.reduce((a,st)=>a+((G.stoveLv||{})[st]||1)-1,0)/d.steps.length*6;return Math.round(d.ref*(1+q/100)/5)*5}
@@ -1065,7 +1122,7 @@ function drawStats(compact,vw=W){
   if(R.battle)return drawBattleBoard(compact,vw);
   const x=vw-194,y=4,w=190,h=compact?88:146;ctx.fillStyle='#f3ead8';rr(x,y,w,h,10);ctx.fill();ctx.strokeStyle='#2f6fa8';ctx.lineWidth=3;rr(x,y,w,h,10);ctx.stroke();
   label('今日營業',x+w/2,y+18,'#4a3a2c',13,true);
-  const cells=[[G.dlvOn?'內用／外送':'內用',G.today.served+' 組'+(G.dlvOn?'／'+(G.today.dlv||0)+' 單':'')],['營收','$'+fmt(G.today.rev)],...(compact?[]:G.menu.slice(0,4).map(id=>[DMAP[id].short,(G.today.dish[id]||0)+' 份']))];
+  const cells=[[G.dlvOn?'內用／外送':'內用',G.today.served+' 組'+(G.dlvOn?'／'+(G.today.dlv||0)+' 單':'')],['營收','$'+fmt(G.today.rev)],...(compact?[]:G.menu.slice().sort((x,y)=>(G.today.dish[y]||0)-(G.today.dish[x]||0)).slice(0,2).map(id=>[DMAP[id].short,(G.today.dish[id]||0)+' 份']))];
   cells.forEach(([a,b],i)=>{const cx=x+10+(i%2)*88,cy=y+26+Math.floor(i/2)*38;ctx.fillStyle='#fff';rr(cx,cy,82,34,6);ctx.fill();
     label(a,cx+41,cy+13,'#6b5d50',10,true);label(b,cx+41,cy+29,'#2a2420',13,true)});
   const q=R.cust.filter(c=>c.st==='queue').length,dq=R.cust.filter(c=>c.st==='dwait').length;
@@ -1286,7 +1343,7 @@ function showPrep(){
     return h};
   const priceRow=d=>{const r=priceR(d);const em=r<=.9?'😀':r<=1.1?'🙂':r<=1.3?'😐':r<=1.5?'😟':'😡';
     const on=G.menu.includes(d.id), ok=dishOk(d), miss=d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]);
-    return `<div class="box" style="${on?'':'opacity:.55'}"><div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="m_${d.id}" data-menu="${d.id}"${on?' checked':''}${ok?'':' disabled'}>${d.name}</label><span>${em}</span></div>
+    return `<div class="box" style="${on?'':'opacity:.55'}"><div class="row"><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" id="m_${d.id}" data-menu="${d.id}"${on?' checked':''}${ok?'':' disabled'}>${d.cuisine?CUISINES[d.cuisine].ic:''}${d.name}</label><span>${em}</span></div>
     ${ok?'':`<div class="small neg">需要${miss.join('、')}（擴店後可買）</div>`}
     <div class="small">備料：${d.req.map(k=>ITEM[k].n).join('、')}</div>
     <div class="small">${d.steps.map(s=>ROLES[s]).join('→')}｜成本 ${d.ing.reduce((a,k)=>a+ING[k],0)}｜合理價 $${fairPrice(d)}</div>${r>1.5?'<div class="small neg">太貴了：有別的菜可以點，客人就不會點這道</div>':''}
@@ -1306,7 +1363,7 @@ function showPrep(){
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    ${intro}${(G.reqs||[]).length||(G.regulars||[]).length?reqHtml():''}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${SEASON_ING[seasonI()].cheap===k?' <b class="pos">當季</b>':''}${ingP(k)>ING[k]?' <b class="neg">貴</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 ${eq('fridge')?'八折':'九折'}</button></span></div>`).join('')}</div>
-   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.filter(d=>known(d.id)).map(priceRow).join('')}</div>`;
+   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.filter(d=>known(d.id)).sort((a,b)=>(a.cuisine?1:0)-(b.cuisine?1:0)).map(priceRow).join('')}</div>`;
   if(day){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
       return `<div class="box"><div class="row"><b>${c.name}</b><span class="tag">${c.title}</span></div><div class="small">${c.traits.join('、')}</div>
@@ -1315,6 +1372,7 @@ function showPrep(){
       <p class="small">${tableN()} 桌店面最多 ${staffCap()} 位員工（目前 ${G.staff.length} 位）。</p>
       ${promoHtml()}
       ${dlvHtml()}
+      <h2>菜系</h2><div class="box row"><span>台式${(G.cuisines||[]).map(k=>'、'+CUISINES[k].n).join('')}</span><button class="btn sm" id="bCuisine">🍜 開新菜系</button></div>
       <h2>裝潢與設備</h2><div class="box row"><span>${Object.keys(DECOR).filter(k=>dl(k)).map(k=>DECOR[k].ic+DECOR[k].n+dl(k)+'級').join('、')||'還沒裝潢'}｜${Object.keys(EQUIP).filter(eq).map(k=>EQUIP[k].ic).join(' ')||'沒有設備'}</span><button class="btn sm" id="bShop">🏠 裝潢與設備</button></div>
       <h2>對手</h2><div class="box row"><span>${(G.rivals||[]).length?G.rivals.map(r=>(r.kind==='nem'?'👑':'')+r.name+' '+Math.round(r.str)+(r.ally?'🤝':'')).join('、'):'目前還沒有對手'}</span><button class="btn sm" id="bRival">⚔ 看對手</button></div>
       <h2>分店</h2><div class="box row"><span>${(G.branches||[]).length?'目前 '+G.branches.length+' 家分店，昨天合計 '+fmt(G.branches.reduce((a,b)=>a+(b.last?b.last.net:0),0)):'找房仲看店面、派店長，開第一家分店'}</span><button class="btn sm" id="bBranch">🏪 分店管理</button></div>
@@ -1332,6 +1390,7 @@ function showPrep(){
   if($('bRival'))$('bRival').onclick=openRivals;
   if($('bAch'))$('bAch').onclick=e=>{e.preventDefault();openAch()};
   if($('bShop'))$('bShop').onclick=openShop;
+  if($('bCuisine'))$('bCuisine').onclick=openCuisine;
   P.querySelectorAll('[data-dlv]').forEach(b=>b.onclick=()=>{const a=b.dataset.dlv;if(a==='join'){if(!capOk(DLV_JOIN))return;G.cash-=DLV_JOIN;G.dlvJoined=true;G.dlvOn=true;toast('加入外送平台了！')}else G.dlvOn=a==='on';showPrep()});
   P.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{const k=b.dataset.promo,c=promoCost(k);if(!capOk(c))return;G.cash-=c;G.promo=(G.promo||[]).concat([{k,left:PROMO[k].left,hi:($('prTgt')||{}).value==='1'}]);toast(PROMO[k].n+' 開始了！');showPrep()});
   P.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>startRD(b.dataset.rd,($('rdChef')||{}).value));
@@ -1713,7 +1772,7 @@ const ACH=[
  {id:'karen5',cat:'挑戰',n:'奧客剋星',d:'處理好 5 位奧客',rw:8000,ok:()=>stt('karen')>=5},
  {id:'reg10',cat:'挑戰',n:'人情味',d:'同時有 10 位熟客',rw:10000,ok:()=>(G.regulars||[]).length>=10},
  {id:'recipe',cat:'挑戰',n:'阿嬤的味道',d:'集滿 4 頁秘傳食譜',rw:20000,ok:()=>((G.story||{}).pages||0)>=4},
- {id:'rd6',cat:'挑戰',n:'研發狂人',d:'研發出 6 道台式新菜',rw:15000,ok:()=>DISHES.filter(d=>!BASE_DISH.includes(d.id)&&!d.story&&known(d.id)).length>=6},
+ {id:'rd6',cat:'挑戰',n:'研發狂人',d:'研發出 6 道台式新菜',rw:15000,ok:()=>DISHES.filter(d=>!BASE_DISH.includes(d.id)&&!d.story&&!d.cuisine&&known(d.id)).length>=6},
  // 收集
  {id:'hid3',cat:'收集',n:'臥虎藏龍',d:'聘到 3 位隱藏員工',rw:10000,ok:()=>G.staff.filter(s=>s.hid).length>=3},
  {id:'decor',cat:'收集',n:'四種風情',d:'四種裝潢都至少 1 級',rw:10000,ok:()=>Object.keys(DECOR).every(k=>dl(k)>=1)},
@@ -1731,6 +1790,19 @@ function checkAch(m){
     if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a)}}
   got.forEach((a,i)=>setTimeout(()=>toast('🏆 成就達成：'+a.n+(a.rw>1?'（+'+fmt(a.rw)+'）':''),3.5),i*1800));
   return got;
+}
+function cuisineCost(){return [80000,150000,250000,400000][Math.min(3,(G.cuisines||[]).length)]+((G.cuisines||[]).length>3?((G.cuisines||[]).length-3)*150000:0)}
+function openCuisine(){
+  const own=G.cuisines||[];
+  let h=`<h1>🍜 菜系</h1><p class="small">台式之外，可以再開別的菜系。開了之後該菜系 6 道菜馬上可以加進菜單（還是要有對應的爐具）。菜系越多，菜單越有變化，但要備的料也越雜。</p><div class="grid">`;
+  for(const [k,C] of Object.entries(CUISINES)){const ds=DISHES.filter(d=>d.cuisine===k),has=own.includes(k);
+    h+=`<div class="box" style="${has?'border:2px solid var(--gold)':''}"><b>${C.ic} ${C.n}料理</b>${has?' <span class="small pos">✔ 已開</span>':''}
+      <div class="small">${ds.map(d=>`${d.name}（${d.steps.map(s=>ROLES[s]).join('→')}・$${d.ref}）`).join('、')}</div>
+      ${has?'':`<button class="btn sm" data-cu="${k}" style="margin-top:6px">開${C.n} ${fmt(cuisineCost())}</button>`}</div>`}
+  showOverlay(h+`</div><div class="foot"><button class="btn" id="cuBack">回到準備畫面</button></div>`,'cuisine');$('cuBack').onclick=showPrep;
+  $('panel').querySelectorAll('[data-cu]').forEach(b=>b.onclick=()=>{const k=b.dataset.cu,c=cuisineCost();if(!capOk(c))return;G.cash-=c;
+    G.cuisines=[...own,k];const ids=DISHES.filter(d=>d.cuisine===k).map(d=>d.id);G.known=[...new Set([...(G.known||BASE_DISH),...ids])];ids.forEach(id=>{if(G.prices[id]==null)G.prices[id]=DMAP[id].ref});
+    toast('🎉 開了'+CUISINES[k].n+'料理！到菜單勾選要賣的菜',3.5);save();openCuisine()});
 }
 function openAch(back){
   G.ach=G.ach||{};const n=ACH.filter(a=>G.ach[a.id]).length;
@@ -2031,7 +2103,7 @@ const RD_MODE={wok:{n:'炒',act:'翻鍋！',tip:'鍋氣要夠：指針跑到綠�
   steam:{n:'蒸',act:'掀蓋！',tip:'控火：蒸氣冒到綠色區時掀蓋。',sp:.8,w:.2}};
 let RD=null;
 function rdHtml(){
-  const done=G.rdDay===G.day, cands=DISHES.filter(d=>!known(d.id)&&!d.story), redo=DISHES.filter(d=>known(d.id));
+  const done=G.rdDay===G.day, cands=DISHES.filter(d=>!known(d.id)&&!d.story&&!d.cuisine), redo=DISHES.filter(d=>known(d.id)&&!d.cuisine&&!d.story);
   const box=(d,again)=>{const q=(G.dishQ||{})[d.id];return `<div class="box"><div class="row"><b>${DISH_IC[d.id]||'🍽'} ${d.name}</b><span class="small">${d.steps.map(s=>ROLES[s]).join('→')}</span></div>
     <div class="small">${again?`目前品質加成 ${q?(q>0?'+':'')+q:'0'}`:'參考售價 $'+d.ref}｜試做材料 ${fmt(rdCost(d))}${dishOk(d)?'':'<br><span class="neg">研發成功後，要有'+d.steps.filter(x=>!owned(x)).map(x=>STOVE_FULL[x]).join('、')+'才能賣</span>'}</div>
     <button class="btn sm${again?' ghost':''}" data-rd="${d.id}" ${done?'disabled':''} style="margin-top:4px">${again?'重新研發':'開始研發'}</button></div>`};
