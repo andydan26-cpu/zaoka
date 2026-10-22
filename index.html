@@ -546,7 +546,7 @@ function update(dt){
   // 洗碗
   const cw=stationWorkers('sink');
   if(R.sinkDirty>0&&cw.length&&!PWR&&!WTR){R.washP=(R.washP||0)+dt/2.2*cw.reduce((a,w)=>a+workerFactor(w.p,'clean',w.boss),0);
-    while(R.washP>=1&&R.sinkDirty>0){R.washP--;R.sinkDirty--;G.plates++;cw.forEach(w=>grow(w.p,'clean',.25))}}
+    while(R.washP>=1&&R.sinkDirty>0){R.washP--;R.sinkDirty--;G.plates++;if(cw.some(w=>w.boss)&&!TUT)stAdd('bwash');cw.forEach(w=>grow(w.p,'clean',.25))}}
   if(eq('dish')&&R.sinkDirty>0&&!PWR&&!WTR&&!cw.length){R.dwP=(R.dwP||0)+dt/3;if(R.dwP>=1){R.dwP=0;R.sinkDirty--;G.plates++}} // 洗碗機自己洗
   dogUpdate(dt);
   // 客人
@@ -577,7 +577,7 @@ function dogUpdate(dt){
     const like=Math.random()<DOG_LIKE[c.type];
     if(c.st==='eat'){if(like){c.dogBonus=(c.dogBonus||0)+.15}else{c.dogBonus=(c.dogBonus||0)-.15}}
     else{const v=c.patMax*(like?.18:-.18);c.pat=clamp(c.pat+v,1,c.patMax)}
-    d.react={t:1.6,like}; fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
+    d.react={t:1.6,like}; if(like)stAdd('dog'); fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
     if(like){d.wait=1.2;d.tx=d.x;d.ty=d.y}
     else{d.wait=0;d.tx=clamp(d.x+rnd(-160,160),40,H>KH?960:570);d.ty=clamp(d.y+rnd(-80,80),d.tx>590?KH+20:240,H-20)}
     break;
@@ -814,6 +814,7 @@ function endMeal(){
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
   const quit=G.staff.filter(s=>s.mood<=0);G.staff=G.staff.filter(s=>s.mood>0);quit.forEach(s=>{notes.push(s.name+' 心情跌到谷底，離職了');friendsLeave(s,notes)});
+  {const got=checkAch(res);if(got.length)notes.push('🏆 '+got.map(a=>a.n).join('、'))}
   const wasMeal=G.meal;
   G.meal++;
   if(G.meal>2){G.meal=0;dayEnd(res,notes)} else {res.title=MEALS[wasMeal]+'結束';showBetween(res,false)}
@@ -1298,9 +1299,10 @@ function showPrep(){
     STOVES.filter(k=>!owned(k)).forEach(k=>{h+=`<div class="box row"><span>${STOVE_FULL[k]}<br><span class="small">${free>0?'有空位，可以買':'先擴店才有空位'}</span></span><button class="btn sm" data-buystove="${k}" ${free>0?'':'disabled'}>${fmt(NEW_STOVE_COST)}</button></div>`});
     return h};
   const intro=!G.prepIntro?`<div class="box" style="display:flex;gap:10px;align-items:center;border:2px solid var(--red);margin:8px 0"><img alt="" src="${ART_SRC.chef}" style="width:48px"><span><b style="color:var(--red)">阿福師</b><br>每一場開店前都會來這裡：排誰做哪個崗位、去進貨、決定今天賣哪幾道菜跟價錢。食材箱的貨不夠，營業中就沒得做。弄好了按最下面「開始營業」。</span></div>`:'';
+  checkAch(null);
   let h=`<h1>第 ${G.day} 天・${MEALS[G.meal]} 準備</h1>
    ${G.booking?`<div class="box" style="border:2px solid var(--gold);margin:6px 0">${G.booking.type==='party'?'🎊 這場是「'+G.booking.name+'」包場':'📒 這場有訂位：'+G.booking.name+' '+G.booking.groups+' 桌'}</div>`:''}
-   <p class="small" style="margin:2px 0">${calLine()}${G.story&&G.story.pages?`｜📜 秘傳食譜 ${G.story.pages}/4`:''}</p>
+   <p class="small" style="margin:2px 0"><a href="#" id="bAch" style="color:var(--red);font-weight:700">🏆 成就 ${ACH.filter(a=>(G.ach||{})[a.id]).length}/${ACH.length}</a>｜${calLine()}${G.story&&G.story.pages?`｜📜 秘傳食譜 ${G.story.pages}/4`:''}</p>
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    ${intro}${(G.reqs||[]).length||(G.regulars||[]).length?reqHtml():''}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${SEASON_ING[seasonI()].cheap===k?' <b class="pos">當季</b>':''}${ingP(k)>ING[k]?' <b class="neg">貴</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 ${eq('fridge')?'八折':'九折'}</button></span></div>`).join('')}</div>
@@ -1328,6 +1330,7 @@ function showPrep(){
   P.querySelectorAll('select[data-id]').forEach(el=>el.onchange=()=>{G.staff.find(s=>s.id==el.dataset.id).role=el.value;showPrep()});
   if($('bBranch'))$('bBranch').onclick=openBranches;
   if($('bRival'))$('bRival').onclick=openRivals;
+  if($('bAch'))$('bAch').onclick=e=>{e.preventDefault();openAch()};
   if($('bShop'))$('bShop').onclick=openShop;
   P.querySelectorAll('[data-dlv]').forEach(b=>b.onclick=()=>{const a=b.dataset.dlv;if(a==='join'){if(!capOk(DLV_JOIN))return;G.cash-=DLV_JOIN;G.dlvJoined=true;G.dlvOn=true;toast('加入外送平台了！')}else G.dlvOn=a==='on';showPrep()});
   P.querySelectorAll('[data-promo]').forEach(b=>b.onclick=()=>{const k=b.dataset.promo,c=promoCost(k);if(!capOk(c))return;G.cash-=c;G.promo=(G.promo||[]).concat([{k,left:PROMO[k].left,hi:($('prTgt')||{}).value==='1'}]);toast(PROMO[k].n+' 開始了！');showPrep()});
@@ -1687,6 +1690,57 @@ function dealView(aid,x,msg=''){
 
 
 
+
+/* ---------- 成就 ---------- */
+const stt=k=>((G.st||{})[k]||0);
+function stAdd(k,v=1){G.st=G.st||{};G.st[k]=(G.st[k]||0)+v}
+const ACH=[
+ // 經營里程碑
+ {id:'first',cat:'里程碑',n:'開張大吉',d:'完成第一場營業',rw:1000,ok:m=>!!m},
+ {id:'s100',cat:'里程碑',n:'小有名氣',d:'累積服務 100 組客人',rw:3000,ok:()=>((G.story||{}).served||0)>=100},
+ {id:'s1000',cat:'里程碑',n:'巷口傳奇',d:'累積服務 1,000 組客人',rw:20000,ok:()=>((G.story||{}).served||0)>=1000},
+ {id:'star4',cat:'里程碑',n:'四星老店',d:'老店評價到 4 星',rw:10000,ok:()=>stars()>=4},
+ {id:'half',cat:'里程碑',n:'債還一半',d:'負債還到 75 萬以下',rw:30000,ok:()=>G.debt<=750000},
+ {id:'clear',cat:'里程碑',n:'阿嬤，債還清了',d:'還清 150 萬負債',rw:100000,ok:()=>G.debt<=0},
+ {id:'br1',cat:'里程碑',n:'第一家分店',d:'開第一家分店',rw:20000,ok:()=>(G.branches||[]).length>=1},
+ {id:'br5',cat:'里程碑',n:'連鎖帝國',d:'同時有 5 家分店',rw:100000,ok:()=>(G.branches||[]).length>=5},
+ {id:'t20',cat:'里程碑',n:'大食堂',d:'座位擴到 20 桌',rw:50000,ok:()=>tableN()>=20},
+ {id:'nem',cat:'里程碑',n:'物歸原主',d:'併購金鼎集團',rw:0,ok:()=>!!G.nemDone},
+ // 挑戰
+ {id:'perfect',cat:'挑戰',n:'零客訴',d:'一場服務 15 組以上，沒有人生氣也沒有人走掉',rw:5000,ok:m=>m&&m.served>=15&&!m.angry&&!m.lost},
+ {id:'rich',cat:'挑戰',n:'日進斗金',d:'單場營收破 1 萬',rw:5000,ok:m=>m&&m.rev>=10000},
+ {id:'dlv20',cat:'挑戰',n:'外送王',d:'一天完成 20 張外送單',rw:8000,ok:()=>(G.today.dlv||0)>=20},
+ {id:'karen5',cat:'挑戰',n:'奧客剋星',d:'處理好 5 位奧客',rw:8000,ok:()=>stt('karen')>=5},
+ {id:'reg10',cat:'挑戰',n:'人情味',d:'同時有 10 位熟客',rw:10000,ok:()=>(G.regulars||[]).length>=10},
+ {id:'recipe',cat:'挑戰',n:'阿嬤的味道',d:'集滿 4 頁秘傳食譜',rw:20000,ok:()=>((G.story||{}).pages||0)>=4},
+ {id:'rd6',cat:'挑戰',n:'研發狂人',d:'研發出 6 道台式新菜',rw:15000,ok:()=>DISHES.filter(d=>!BASE_DISH.includes(d.id)&&!d.story&&known(d.id)).length>=6},
+ // 收集
+ {id:'hid3',cat:'收集',n:'臥虎藏龍',d:'聘到 3 位隱藏員工',rw:10000,ok:()=>G.staff.filter(s=>s.hid).length>=3},
+ {id:'decor',cat:'收集',n:'四種風情',d:'四種裝潢都至少 1 級',rw:10000,ok:()=>Object.keys(DECOR).every(k=>dl(k)>=1)},
+ {id:'equip',cat:'收集',n:'設備齊全',d:'八種設備都有',rw:15000,ok:()=>Object.keys(EQUIP).every(eq)},
+ // 搞笑（隱藏）
+ {id:'crazy',cat:'搞笑',hid:1,n:'老闆你認真的嗎',d:'把一道菜定價到 999 元以上',rw:1,ok:()=>Object.values(G.prices||{}).some(v=>v>=999)},
+ {id:'empty',cat:'搞笑',hid:1,n:'門可羅雀',d:'一整場一個客人都沒有',rw:500,ok:m=>m&&m.served===0&&!m.lost&&!m.angry&&!m.dlv},
+ {id:'dog',cat:'搞笑',hid:1,n:'小黃店長',d:'小黃讓 50 位客人開心',rw:2000,ok:()=>stt('dog')>=50},
+ {id:'broke',cat:'搞笑',hid:1,n:'碎碎平安',d:'累計打破 30 個盤子',rw:300,ok:()=>stt('broke')>=30},
+ {id:'wash',cat:'搞笑',hid:1,n:'洗碗老闆',d:'老闆親手洗了 100 個盤子',rw:3000,ok:()=>stt('bwash')>=100},
+];
+function checkAch(m){
+  if(TUT||(R&&R.battle))return [];G.ach=G.ach||{};const got=[];
+  for(const a of ACH){if(G.ach[a.id])continue;let ok=false;try{ok=a.ok(m)}catch(e){}
+    if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a)}}
+  got.forEach((a,i)=>setTimeout(()=>toast('🏆 成就達成：'+a.n+(a.rw>1?'（+'+fmt(a.rw)+'）':''),3.5),i*1800));
+  return got;
+}
+function openAch(back){
+  G.ach=G.ach||{};const n=ACH.filter(a=>G.ach[a.id]).length;
+  let h=`<h1>🏆 成就 ${n}／${ACH.length}</h1>`;
+  for(const cat of ['里程碑','挑戰','收集','搞笑']){h+=`<h2>${cat}</h2><div class="grid">${ACH.filter(a=>a.cat===cat).map(a=>{const done=G.ach[a.id];
+    if(a.hid&&!done)return `<div class="box" style="opacity:.6"><b>❓ ？？？</b><br><span class="small">隱藏成就，玩著玩著就會發現</span></div>`;
+    return `<div class="box" style="${done?'border:2px solid var(--gold)':'opacity:.75'}"><b>${done?'🏆':'⬜'} ${a.n}</b><br><span class="small">${a.d}</span><br><span class="small">${done?'<b class="pos">第 '+done+' 天達成</b>':''}${a.rw>1?'　獎勵 '+fmt(a.rw):''}</span></div>`}).join('')}</div>`}
+  showOverlay(h+`<div class="foot"><button class="btn" id="achBack">返回</button></div>`,'ach');$('achBack').onclick=back||showPrep;
+}
+
 /* ---------- 裝潢與設備 ---------- */
 const DECOR={retro:{n:'懷舊台味',ic:'🏮',d:'熟客多：客人變熟客機率、耐心提高'},insta:{n:'文青網美',ic:'🪴',d:'年輕人愛拍照：客人變多、飲料小菜賣更好'},
   fam:{n:'溫馨家庭',ic:'🎈',d:'家庭客變多，家庭客更有耐心'},lux:{n:'高級精緻',ic:'🕯',d:'美食家變多，美食家的評價更有份量；每級每天維護費 300'}};
@@ -1740,7 +1794,7 @@ const KAREN=[
 function karenEvent(c){
   const K=pick(KAREN);c.karenT=K.t;
   evBox('😤 奧客出現：'+K.t,K.d,shuffle(K.o.map((t,i)=>({t,i}))).map(({t,i})=>({t,f(){
-    if(i===K.ok){c.karenOK=true;c.karen=false;toast('處理得好！這桌客人氣消了，帳單照付還多給',3);G.staff.forEach(s=>s.role==='floor'&&(s.mood=Math.min(100,s.mood+5)))}
+    if(i===K.ok){stAdd('karen');c.karenOK=true;c.karen=false;toast('處理得好！這桌客人氣消了，帳單照付還多給',3);G.staff.forEach(s=>s.role==='floor'&&(s.mood=Math.min(100,s.mood+5)))}
     else{c.karen=false;G.staff.forEach(s=>{if(s.role==='floor')s.mood=Math.max(1,s.mood-8)});
       if(i===0&&K.ok!==0&&K.t==='嫌太貴'){c.disc=.8;addReview(2,2,'吵一吵就打折，這家很好拗');toast('打折了，但這種事會傳出去…',3)}
       else{leaveAngry(c,'奧客大鬧',false);addReview(1,2,'奧客：這家服務超爛');toast('奧客大鬧後離開，還留了負評',3)}}}})),true); // 選項順序打亂，不會一看就知道答案
@@ -2183,7 +2237,7 @@ const MEAL_EV=[
    evBox('🚱 停水','整條街停水，洗菜槽和洗碗槽都不能用，大約 25 秒後恢復。',
    [{t:'叫水電行接水（1,500，5 秒）',f(){G.cash-=1500;R.ev.water=5}},{t:'等它恢復'}],true)}},
  {id:'power',ok:()=>!evSafe()&&!eq('gen'),run(){R.ev.power=1;R.ev.pfix=0;fx(800,330,'⚡ 跳電！','#b8352a');toast('跳電了！廚房全停，快去門口電箱把開關扳回來',4)}},
- {id:'plates',ok:()=>!evSafe()&&G.plates>3,run(){const n=Math.min(G.plates,6);G.plates-=n;G.platesLost=(G.platesLost||0)+n;fx(ST.plates?ST.plates.x:150,170,'💥 盤子破了 -'+n,'#b8352a');toast('砰！一疊盤子摔破了，少了 '+n+' 個。休息時間可以去補買',3.5)}},
+ {id:'plates',ok:()=>!evSafe()&&G.plates>3,run(){const n=Math.min(G.plates,6);G.plates-=n;G.platesLost=(G.platesLost||0)+n;stAdd('broke',n);fx(ST.plates?ST.plates.x:150,170,'💥 盤子破了 -'+n,'#b8352a');toast('砰！一疊盤子摔破了，少了 '+n+' 個。休息時間可以去補買',3.5)}},
  {id:'roach',ok:()=>!evSafe()&&!R.ev.roach&&!eq('pest'),run(){const spots=[[280,250],[280,420],[520,420],[300,600],[540,270]],q=pick(spots);
    R.ev.roach={x:q[0],y:q[1],t:0,p:0,next:6};SPOTS.roach={x:q[0],y:q[1],r:26,sx:q[0],sy:q[1]+4};
    toast('🪳 有蟑螂！老闆走過去踩 3 秒，拖越久客人越不爽',4)}},
