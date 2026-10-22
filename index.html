@@ -505,7 +505,7 @@ function startMeal(){
   for(let i=0;i<n;i++){const u=Math.random();
     R.spawns.push(m===1?150*Math.pow(u,1.6):m===2?150*Math.sqrt(u):150*u);}
   R.spawns.sort((a,b)=>a-b);
-  G.staff.forEach(s=>{s.rt={x:IDLE.x+rnd(-30,30),y:IDLE.y+rnd(-15,15),task:null,carry:null,slack:0,there:false};s.mealStart={mood:s.mood}});
+  G.staff.forEach(s=>{s.rt={x:IDLE.x+rnd(-30,30),y:IDLE.y+rnd(-15,15),task:null,carry:null,slack:0,there:false};s.mealStart={mood:s.mood};s.offShift=s.role==='rest'});
   paused=false; hideOverlay(); renderBar();
   if(G.tutorial) toast('食材架拿食材→備料區處理→切好區拿去爐具',6);
 }
@@ -1013,7 +1013,7 @@ function endMeal(){
   mentorAfterMeal(notes);
   if(eq('rest'))G.staff.forEach(s=>s.stam=Math.min(100,s.stam+8));
   if(G.staff.some(s=>s.hid==='xiaowen'))G.staff.forEach(s=>s.mood=Math.min(100,s.mood+5));
-  G.staff.forEach(s=>{if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
+  G.staff.forEach(s=>{delete s.offShift;if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
   const res={dlv:R.dlvDone||0,dlvLate:R.dlvLate||0,rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
@@ -1297,7 +1297,7 @@ function hud(){
   $('hStock').innerHTML=Object.keys(ING).filter(k=>G.stock[k]+G.bench[k]<5).map(k=>`<span class="chip low">${k} ${G.stock[k]+G.bench[k]}</span>`).join('');
 }
 function renderBar(){
-  $('bar').innerHTML=G.staff.map(s=>`<div class="card${s===selected?' sel':''}" data-id="${s.id}" tabindex="0">
+  $('bar').innerHTML=G.staff.map(s=>R&&s.offShift?`<div class="card" style="opacity:.45;cursor:default"><div class="nm"><span>${s.name}</span><span>排休</span></div><div class="small">這場休假，下一場再排班</div></div>`:`<div class="card${s===selected?' sel':''}" data-id="${s.id}" tabindex="0">
    <div class="nm"><span>${s.name}</span><span>${ROLES[s.role]}</span></div>
    <div class="small">心情 ${Math.round(s.mood)}</div><div class="meter"><i style="width:${s.mood}%;background:${s.mood<40?'var(--bad)':'var(--gold)'}"></i></div>
    <div class="small">體力 ${Math.round(s.stam)}</div><div class="meter"><i style="width:${s.stam}%;background:${s.stam<20?'var(--bad)':'var(--ok)'}"></i></div>
@@ -1331,6 +1331,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 function assign(s,role){
   if(s.onLeave){toast(s.name+' 今天請假，不能排班');return}
+  if(R&&s.offShift){toast(s.name+' 這場排休，要等這場結束才能排班');return}
   if(s.rt.task){const T=s.rt.task;if(T.tb&&T.tb.res===s)T.tb.res=null;if(T.t&&T.t.res===s&&T.ph===0)T.t.res=null;if(T.k==='cash'&&T.c.handler===s)T.c.handler=null}
   s.rt.help=null; if(s.rt.fetch){s.rt.fetch.res=null;s.rt.fetch=null}
   s.rt.goShelf=null; if(s.rt.carry&&s.rt.carry.basket){G.stock[s.rt.carry.basket]+=s.rt.carry.n;s.rt.carry=null}
@@ -1468,6 +1469,15 @@ function opFloor(){const sal=G.staff.filter(s=>s.role!=='rest').reduce((a,s)=>a+
 function opCap(){return opFloor()+5000}
 // 非營業必要的花費（還債、投資、聘人）不能動到營業本金
 const capOk=c=>{if(G.cash-c<opCap()){toast('花了會低於營業本金 '+fmt(opCap())+'，店就開不了');return false}return true};
+// 菜單篩選：烹調方式或菜系，只列出想看的菜
+function menuPass(d){const f=G.menuFilter||'all';if(f==='all')return true;if(f==='on')return G.menu.includes(d.id);
+  if(f.startsWith('st:'))return d.steps.includes(f.slice(3));if(f==='c:tw')return !d.cuisine&&!d.local;if(f==='c:local')return !!d.local;return d.cuisine===f.slice(2)}
+function menuFilterHtml(){const f=G.menuFilter||'all',ks=DISHES.filter(d=>known(d.id)),n=t=>ks.filter(d=>{const o=G.menuFilter;G.menuFilter=t;const r=menuPass(d);G.menuFilter=o;return r}).length;
+  const o=(v,t)=>{const c=n(v);return c||v==='all'||v==='on'?`<option value="${v}"${f===v?' selected':''}>${t}（${c}）</option>`:''};
+  const cu=[...new Set(ks.filter(d=>d.cuisine).map(d=>d.cuisine))];
+  return `<div class="row" style="justify-content:flex-start;gap:8px;margin:4px 0 8px"><span class="small">顯示</span><select id="menuFilter">${o('all','全部')}${o('on','只看今天有賣的')}
+   <optgroup label="烹調方式">${o('st:boil','煮')}${o('st:wok','炒')}${o('st:steam','蒸')}${o('st:fry','炸')}</optgroup>
+   <optgroup label="菜系">${o('c:tw','台式')}${o('c:local','在地菜')}${cu.map(k=>o('c:'+k,CUISINES[k].n)).join('')}</optgroup></select></div>`}
 function showPrep(){
   paused=true;selected=null;
   const day=G.meal===0;
@@ -1517,7 +1527,7 @@ function showPrep(){
    <p class="small">現金 ${fmt(G.cash)}｜負債 ${fmt(G.debt)}｜第 ${G.week} 週（32 週內還清）｜乾淨盤子 ${G.plates}</p>
    ${intro}${(G.reqs||[]).length||(G.regulars||[]).length?reqHtml():''}<h2>排班</h2><div class="grid">${bossBox()}${G.staff.map(staffBox).join('')}</div>${comboHtml()}
    <h2>進貨</h2><div class="grid"><div class="box row"><span>盤子<br><span class="small">乾淨盤 ${G.plates}${G.platesLost?`｜打破了 ${G.platesLost} 個`:''}｜一個 80</span></span><span><button class="btn sm" data-plate="5">+5</button> <button class="btn sm ghost" data-plate="10">+10</button></span></div>${Object.keys(ING).map(k=>`<div class="box row"><span>${k}<br><span class="small">食材架 ${G.stock[k]}｜備料區 ${G.bench[k]}｜單價 ${ingP(k)}${SEASON_ING[seasonI()].cheap===k?' <b class="pos">當季</b>':''}${ingP(k)>ING[k]?' <b class="neg">貴</b>':''}</span></span><span><button class="btn sm" data-buy="${k}" data-n="10">+10</button> <button class="btn sm ghost" data-buy="${k}" data-n="30">+30 ${eq('fridge')?'八折':'九折'}</button></span></div>`).join('')}</div>
-   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p><div class="grid">${DISHES.filter(d=>known(d.id)).sort((a,b)=>(a.cuisine?1:0)-(b.cuisine?1:0)).map(priceRow).join('')}</div>`;
+   <h2>今日菜單與定價</h2><p class="small">勾選今天要賣的菜。菜單越多，要準備的食材種類越多；人手少時菜單越短越好。表情是客人對價格的反應。</p>${menuFilterHtml()}<div class="grid">${DISHES.filter(d=>known(d.id)&&menuPass(d)).sort((a,b)=>(a.cuisine?1:0)-(b.cuisine?1:0)).map(priceRow).join('')||'<div class="box small">這個分類目前沒有會做的菜</div>'}</div>`;
   if(day){
     h+=`<h2>招募（簽約金一週薪水＋仲介費 2,000）</h2><div class="grid">${G.pool.map(c=>{const tops=Object.entries(c.abil).sort((a,b)=>b[1]-a[1]).slice(0,3);const cost=salary(c)*21+2000;
       return `<div class="box"><div class="row"><b>${c.name}</b><span class="tag">${c.title}</span></div><div class="small">${c.traits.join('、')}</div>
@@ -1557,6 +1567,7 @@ function showPrep(){
     G.staff.forEach(s=>s.mood=Math.min(100,s.mood+15));G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>relAdd(a,b,15)));toast('大家吃得很開心！');showPrep()});
   P.querySelectorAll('[data-plate]').forEach(b=>b.onclick=()=>{const n=+b.dataset.plate,c=n*80;if(G.cash<c)return toast('現金不夠');G.cash-=c;G.plates+=n;G.platesLost=Math.max(0,(G.platesLost||0)-n);showPrep()});
   P.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const k=b.dataset.buy,n=+b.dataset.n,c=Math.round(ingP(k)*n*(n>=30?(eq('fridge')?.8:.9):1));if(G.cash<c)return toast('現金不夠');G.cash-=c;G.stock[k]+=n;showPrep()});
+  if($('menuFilter'))$('menuFilter').onchange=e=>{G.menuFilter=e.target.value;showPrep()};
   P.querySelectorAll('[data-menu]').forEach(b=>b.onchange=()=>{const id=b.dataset.menu;if(b.checked)G.menu.push(id);else{if(G.menu.length<=1){b.checked=true;return toast('至少要賣一道菜')}G.menu=G.menu.filter(x=>x!==id)}showPrep()});
   P.querySelectorAll('[data-pin]').forEach(el=>{const set=()=>{const v=Math.round(+el.value);if(!v||v<20){toast('最低 20 元');el.value=G.prices[el.dataset.pin];return}G.prices[el.dataset.pin]=Math.min(9999,v);showPrep()};el.onchange=set;el.onkeydown=e=>{if(e.key==='Enter')el.blur()}});
   P.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{G.prices[b.dataset.p]=Math.max(20,G.prices[b.dataset.p]+ +b.dataset.v);showPrep()});
