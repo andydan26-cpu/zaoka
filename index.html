@@ -547,13 +547,20 @@ function prepPlan(){
 const JOBS={
   wash:[['sea',1.5,P=>P.washSea>0&&G.bench['海鮮']>0,P=>{G.bench['海鮮']--;G.ready.sea_wash++},'洗蚵仔'],
         ['veg',1.5,P=>P.washVeg>0&&G.bench['蔬菜']>0,P=>{G.bench['蔬菜']--;G.ready.veg_wash++},'洗菜'],
-        ['rice',1.5,P=>P.washRice&&G.bench['米麵']>0,P=>{const n=Math.min(10,G.bench['米麵']);G.bench['米麵']-=n;G.ready.rice_wash+=n},'洗米']],
+        ['rice',1.5,P=>P.washRice&&G.bench['米麵']>0,P=>{const n=Math.min(riceCap(),G.bench['米麵']);G.bench['米麵']-=n;G.ready.rice_wash+=n},'洗米']],
   cut:[['meat',2,P=>P.cutMeat>0&&G.bench['肉']>0,P=>{G.bench['肉']--;G.ready.meat_cut++},'切肉'],
        ['veg',1.5,P=>P.cutVeg>0&&G.ready.veg_wash>P.need.veg_wash,P=>{G.ready.veg_wash--;G.ready.veg_cut++},'切菜']],
   beat:[['egg',1,P=>P.beat>0&&G.bench['蛋奶']>0,P=>{G.bench['蛋奶']--;G.ready.egg_beat++},'打蛋']],
-  rice:[['load',.8,P=>P.riceLoad>0,P=>{const n=Math.min(10,P.riceLoad);G.ready.rice_wash-=n;G.cooker={n,t:RICE_T};},'米下鍋']],
+  rice:[['load',.8,P=>P.riceLoad>0,P=>{const n=Math.min(riceCap(),P.riceLoad);G.ready.rice_wash-=n;G.cooker={n,t:riceT(),T:riceT()};},'米下鍋']],
   mar:[['load',.7,P=>P.marLoad>0&&G.ready.meat_cut>0,P=>{G.ready.meat_cut--;G.mar.push(20)},'放進醃料']],
 };
+// 小設備：讓備料更快、電鍋一次煮更多
+const riceCap=()=>eq('bigrice')?20:10, riceT=()=>RICE_T*(eq('bigrice')?.75:1);
+function jobT(st,j){let t=j[1];
+  if(st==='wash'&&eq('basket'))t*=.5;
+  if(st==='cut'&&j[0]==='meat'&&eq('slicer'))t*=.45;
+  if(st==='beat'&&eq('whisk'))t*=.45;
+  return t}
 const canJob=st=>JOBS[st].some(j=>j[2](R.plan||(R.plan=prepPlan())));
 function ingFlow(){const need={},inc={};for(const k in ING){need[k]=0;inc[k]=0}
   for(const t of R.tickets)if(t.st==='prepQ')DMAP[t.dish].ing.forEach(k=>need[k]++);
@@ -706,7 +713,7 @@ function update(dt){
     if(!job||!job[2](R.plan)){job=JOBS[st].find(j=>j[2](R.plan));S.job=job?job[0]:null;S.p=0}
     S.name=job?job[4]:null;
     if(!job||!ws.length)continue;
-    S.p+=dt/job[1]*ws.reduce((a,w)=>a+workerFactor(w.p,'prep',w.boss),0);
+    S.p+=dt/jobT(st,job)*ws.reduce((a,w)=>a+workerFactor(w.p,'prep',w.boss),0);
     if(S.p>=1){S.p=0;const best=ws.reduce((a,w)=>w.p.abil.prep>a.p.abil.prep?w:a,ws[0]);
       if(st==='cut'&&Math.random()<errChance(best.p,'prep',best.boss)){fx(ST.cut.x,ST.cut.y-40,'切歪了！','#b8352a');R.fx.push({x:ST.cut.x,y:ST.cut.y-20,img:'smoke',t:1});continue}
       job[3](R.plan);G.pq=G.pq*.8+best.p.abil.prep*.2;ws.forEach(w=>grow(w.p,'prep',.3));R.plan=prepPlan();}
@@ -1137,7 +1144,7 @@ function draw(){
         rice:G.cooker?'煮飯 '+Math.ceil(G.cooker.t)+'秒':'白飯'+r.rice_cooked,mar:'醃'+G.mar.length+' 好'+r.meat_mar}[k];
       label(info,s.x,s.y+66,'#2a2420',10,true);
       if(S.name)label(S.name,s.x,s.y+80,'#8a5a2a',10,true);
-      if(k==='rice'&&G.cooker)bar(s.x-25,s.y-6,50,6,1-G.cooker.t/RICE_T,'#3f8f5a');
+      if(k==='rice'&&G.cooker)bar(s.x-25,s.y-6,50,6,1-G.cooker.t/(G.cooker.T||RICE_T),'#3f8f5a');
       if(k==='mar'&&G.mar.length)bar(s.x-25,s.y-6,50,6,1-Math.min(...G.mar)/20,'#3f8f5a');
     } else {label('髒 '+R.sinkDirty+'｜淨 '+G.plates,s.x,s.y+66,'#2a2420',10,true);}
   }
@@ -2030,7 +2037,8 @@ const dl=k=>((G.decor||{})[k]||0);
 const EQUIP={dish:{n:'洗碗機',ic:'🫧',c:30000,d:'沒人顧也會自己洗碗，清潔速度 ×1.5'},fridge:{n:'大冰箱',ic:'🧊',c:15000,d:'大量進貨（+30）從九折變八折'},
   rest:{n:'員工休息室',ic:'🛋',c:25000,d:'每場結束員工體力 +8，營業中休息回復快 5 成'},wait:{n:'候位區',ic:'🪑',c:12000,d:'門口排隊的客人多等 5 成時間'},
   gen:{n:'發電機',ic:'🔋',c:20000,d:'不會再跳電'},tank:{n:'儲水塔',ic:'🛢',c:10000,d:'不會再停水'},
-  pest:{n:'滅蟲契約',ic:'🐜',c:3000,d:'不會有蟑螂，衛生稽查一定過；每週 3,000',week:1},cctv:{n:'監視器',ic:'📹',c:8000,d:'忘帶錢包的客人一定回來付；員工比較不敢偷懶'}};
+  pest:{n:'滅蟲契約',ic:'🐜',c:3000,d:'不會有蟑螂，衛生稽查一定過；每週 3,000',week:1},bigrice:{n:'大飯鍋',ic:'🍚',c:18000,d:'電鍋一次煮 20 碗（原本 10 碗），煮飯時間縮短 25%；洗米也一次洗 20 份'},whisk:{n:'電動打蛋器',ic:'🥚',c:8000,d:'打蛋速度變快一倍以上'},
+  basket:{n:'大洗菜籃',ic:'🧺',c:6000,d:'洗菜、洗蚵仔、洗米速度變兩倍'},slicer:{n:'切肉機',ic:'🔪',c:25000,d:'切肉速度變快一倍以上'},cctv:{n:'監視器',ic:'📹',c:8000,d:'忘帶錢包的客人一定回來付；員工比較不敢偷懶'}};
 const eq=k=>!!((G.eq||{})[k]);
 function openShop(){
   const lv=k=>dl(k);
