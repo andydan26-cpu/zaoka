@@ -1950,38 +1950,58 @@ function agentView(id){
 }
 function dealView(aid,x,msg=''){
   const fee=Math.round(60000*promoScale()/1000)*1000;
-  const cands=[...G.staff.map(s=>({s,src:'staff'})),...G.pool.map(s=>({s,src:'pool'}))];
+  const cands=mgrCands(),S=x.sel||{buy:false,pct:100,ci:0,pol:'rev'};
   showOverlay(`<h1>${x.city}${x.area}・${x.tables} 桌</h1>
    <p class="small">${CROWD[x.crowd].n}客群｜人流 ${x.flow}/5｜附近對手 ${x.rivals} 家｜${x.known?(x.defect?'⚠ '+DEFECT[x.defect].n:'屋況良好'):'屋況不清楚'}</p>
-   ${msg?`<div class="box" style="font-size:15px">${msg}</div>`:''}
+   ${msg?`<div class="box" style="font-size:15px;border:2px solid var(--gold)">${msg}</div>`:''}
    <h2>1. 租還是買</h2>
-   <div class="row" style="justify-content:flex-start;gap:12px;flex-wrap:wrap"><label><input type="radio" name="dl" value="rent" checked> 租：週租 ${fmt(x.rent)}，押金 ${fmt(x.rent*8)}</label>
-    <label><input type="radio" name="dl" value="buy"> 買：開價 ${fmt(x.price)}（不用繳租，收店時可賣回 8 成）</label></div>
+   <div class="row" style="justify-content:flex-start;gap:12px;flex-wrap:wrap"><label><input type="radio" name="dl" value="rent"${S.buy?'':' checked'}> 租：週租 ${fmt(x.rent)}，押金 ${fmt(x.rent*8)}</label>
+    <label><input type="radio" name="dl" value="buy"${S.buy?' checked':''}> 買：開價 ${fmt(x.price)}（不用繳租，收店時可賣回 8 成）</label></div>
    <h2>2. 出價（屋主有底線，出太低會談崩）</h2>
-   <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">${[80,85,90,95,100].map(p=>`<label><input type="radio" name="of" value="${p}"${p===100?' checked':''}> ${p}%</label>`).join('')}<span class="small">還可以談 ${x.tries} 次</span></div>
+   <div class="row" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">${[80,85,90,95,100].map(p=>`<label><input type="radio" name="of" value="${p}"${p===S.pct?' checked':''}> ${p}%</label>`).join('')}<span class="small">還可以談 ${x.tries} 次</span></div>
    <h2>3. 選店長</h2>
-   <select id="dlMgr">${cands.map((c,i)=>`<option value="${i}">${c.s.name}（管理力 ${mgrSkill(c.s)}${c.s.traits.includes('愛錢')?'、愛錢':''}）${c.src==='pool'?'－外聘 '+fmt(salary(c.s)*21+2000):'－從老店調過去'}</option>`).join('')}</select>
+   ${cands.length?`<select id="dlMgr">${cands.map((c,i)=>`<option value="${i}"${i===S.ci?' selected':''}>${c.s.name}（管理力 ${mgrSkill(c.s)}${c.s.traits.includes('愛錢')?'、愛錢':''}）${c.src==='pool'?'－外聘 '+fmt(salary(c.s)*21+2000):'－從老店調過去'}</option>`).join('')}</select>`:'<div class="box small neg">沒有人可以當店長：先在準備畫面招募員工。</div>'}
    <h2>4. 經營方針</h2>
-   <select id="dlPol">${Object.entries(POLICY).map(([k,p])=>`<option value="${k}">${p.n}：${p.d}</option>`).join('')}</select>
-   <p class="small" style="margin-top:8px">另外要付裝潢 ${fmt(fee)}。</p>
-   <div class="foot"><button class="btn ghost" id="dlBack">再看看</button><button class="btn" id="dlGo">出價簽約</button></div>`,'deal');
+   <select id="dlPol">${Object.entries(POLICY).map(([k,p])=>`<option value="${k}"${k===S.pol?' selected':''}>${p.n}：${p.d}</option>`).join('')}</select>
+   <div class="box small" id="dlSum" style="margin-top:8px"></div>
+   <div class="foot"><button class="btn ghost" id="dlBack">再看看</button><button class="btn" id="dlGo"${cands.length?'':' disabled'}>出價簽約</button></div>`,'deal');
+  if(msg)$('panel').scrollTop=0;
+  const read=()=>({buy:document.querySelector('input[name=dl]:checked').value==='buy',pct:+document.querySelector('input[name=of]:checked').value,ci:cands.length?+$('dlMgr').value:0,pol:$('dlPol').value});
+  const sum=()=>{const r=read(),c=cands[r.ci],base=r.buy?x.price:x.rent,ag=Math.round(base*r.pct/100/100)*100,hire=c&&c.src==='pool'?salary(c.s)*21+2000:0,tot=fee+(r.buy?ag:ag*8)+hire;
+    $('dlSum').innerHTML=`這次要付：${r.buy?'買價 '+fmt(ag):'押金 '+fmt(ag*8)+'（週租 '+fmt(ag)+'）'}＋裝潢 ${fmt(fee)}${hire?'＋外聘 '+fmt(hire):''} = <b>${fmt(tot)}</b>｜目前現金 ${fmt(G.cash)}${G.cash-tot<opCap()?'　<span class="neg">（簽完會低於營業本金 '+fmt(opCap())+'）</span>':''}`;x.sel=r};
+  sum();$('panel').querySelectorAll('input,select').forEach(el=>el.onchange=sum);
   $('dlBack').onclick=()=>agentView(aid);
-  $('dlGo').onclick=()=>{
-    const buy=document.querySelector('input[name=dl]:checked').value==='buy',pct=+document.querySelector('input[name=of]:checked').value/100;
-    const c=cands[+$('dlMgr').value];if(!c)return toast('沒有人可以當店長');
-    if(x.tries<=0)return toast('屋主不想再談了');
-    if(pct<x.floor){x.tries--;addLike(aid,-3);return dealView(aid,x,x.tries>0?`屋主搖頭：「${Math.round(pct*100)}% 太低了啦。」（還能談 ${x.tries} 次）`:'屋主生氣不談了，這間沒了。')}
-    const base=buy?x.price:x.rent, agreed=Math.round(base*pct/100)*100;
-    const hire=c.src==='pool'?salary(c.s)*21+2000:0, total=fee+(buy?agreed:agreed*8)+hire;
-    if(G.cash-total<opCap())return dealView(aid,x,`錢不夠：這筆要 ${fmt(total)}，簽完現金會低於營業本金 ${fmt(opCap())}。`);
-    G.cash-=total;
-    if(c.src==='staff')G.staff=G.staff.filter(s=>s!==c.s);else G.pool=G.pool.filter(s=>s!==c.s);
-    const b={id:'B'+Date.now().toString(36),name:x.area.replace('區','')+'店',city:x.city,area:x.area,tables:x.tables,flow:x.flow,crowd:x.crowd,rent:buy?0:agreed,own:buy,price:buy?agreed:0,
-      deposit:buy?0:agreed*8,rivals:x.rivals,defect:x.defect,found:x.known,mgr:c.s,policy:$('dlPol').value,stars:3,last:null};
-    G.branches=G.branches||[];G.branches.push(b);addLike(aid,10);
-    G.listings[aid].items=G.listings[aid].items.filter(y=>y!==x);save();
-    toast('🎉 '+b.name+' 開幕！店長是 '+c.s.name,3.5);unlockLocal(b.city);openBranches();
-  };
+  $('dlGo').onclick=()=>{sum();doDeal(aid,x,x.sel)};
+}
+// 出價結果：屋主答應、還價、拒絕，每一種都有下一步
+function doDeal(aid,x,S,forcePct){
+  const fee=Math.round(60000*promoScale()/1000)*1000,cands=mgrCands(),c=cands[S.ci];
+  if(!c)return toast('沒有人可以當店長');
+  const pct=(forcePct||S.pct)/100;
+  const out=(title,body,btns)=>{showOverlay(`<h1>${title}</h1><div class="box" style="font-size:15px;line-height:1.8">${body}</div><div class="foot">${btns.map((b,i)=>`<button class="btn${b.ghost?' ghost':''}" id="dr${i}">${b.t}</button>`).join('')}</div>`,'dealres');btns.forEach((b,i)=>$('dr'+i).onclick=b.f)};
+  const drop=()=>{G.listings[aid].items=G.listings[aid].items.filter(y=>y!==x)};
+  if(!forcePct&&pct<x.floor){
+    x.tries--;addLike(aid,-3);
+    if(x.tries<=0){drop();return out('🙅 屋主不談了',`「${Math.round(pct*100)}%？你是來亂的吧！」屋主把合約收回去，這間物件沒了。`,[{t:'看別的物件',f:()=>agentView(aid)},{t:'回分店管理',ghost:1,f:openBranches}])}
+    const counter=Math.min(100,Math.ceil(x.floor*100/5)*5+(Math.random()<.5?0:5));
+    return out('🤔 屋主還價',`你出 ${Math.round(pct*100)}%，屋主搖頭：「這價錢太低了。${counter}% 我就簽。」<br><span class="small">還可以再談 ${x.tries} 次；接受還價不會扣次數。</span>`,
+      [{t:`接受 ${counter}%`,f:()=>doDeal(aid,x,{...S,pct:counter},counter)},{t:'改出價',ghost:1,f:()=>dealView(aid,x)},{t:'放棄這間',ghost:1,f:()=>{drop();agentView(aid)}}]);
+  }
+  const base=S.buy?x.price:x.rent, agreed=Math.round(base*pct/100)*100;
+  const hire=c.src==='pool'?salary(c.s)*21+2000:0, total=fee+(S.buy?agreed:agreed*8)+hire;
+  if(G.cash-total<opCap()){
+    const alt=!S.buy?null:fee+x.rent*Math.round(pct*100)/100*8+hire;
+    return out('💸 錢不夠',`這筆要 <b>${fmt(total)}</b>，簽完現金 ${fmt(G.cash-total)} 會低於營業本金 ${fmt(opCap())}，老店會開不了。<br>可以改用租的、換一間便宜的，或先回準備畫面借錢（貸款在準備畫面下方）。`,
+      [...(S.buy?[{t:'改用租的',f:()=>{x.sel={...S,buy:false};dealView(aid,x)}}]:[]),{t:'看別的物件',ghost:1,f:()=>agentView(aid)},{t:'回準備畫面借錢',ghost:1,f:showPrep}]);
+  }
+  G.cash-=total;
+  if(c.src==='staff')G.staff=G.staff.filter(s=>s!==c.s);else G.pool=G.pool.filter(s=>s!==c.s);
+  const b={id:'B'+Date.now().toString(36),name:x.area.replace('區','')+'店',city:x.city,area:x.area,tables:x.tables,flow:x.flow,crowd:x.crowd,rent:S.buy?0:agreed,own:S.buy,price:S.buy?agreed:0,
+    deposit:S.buy?0:agreed*8,rivals:x.rivals,defect:x.defect,found:x.known,mgr:c.s,policy:S.pol,stars:3,last:null};
+  G.branches=G.branches||[];G.branches.push(b);addLike(aid,10);drop();
+  const nw=((CITIES[b.city]||{}).dishes||[]).filter(id=>!known(id));unlockLocal(b.city);save();
+  out('🎉 簽約成功！'+b.name+' 開幕',`📍 ${b.city}${b.area}・${b.tables} 桌｜${S.buy?'買下店面 '+fmt(agreed):'週租 '+fmt(agreed)}<br>👤 店長：${c.s.name}（管理力 ${mgrSkill(c.s)}）｜方針：${POLICY[S.pol].n}<br>💰 這次付了 ${fmt(total)}，剩下現金 ${fmt(G.cash)}${nw.length?`<br>🍜 解鎖在地菜：${nw.map(id=>DMAP[id].name).join('、')}（可以設成這間的招牌菜）`:''}<br><span class="small">接下來：到分店管理設定招牌菜、有空去巡店；每天打烊會自動結算分店收入。</span>`,
+    [{t:'去設定這間分店',f:openBranches},{t:'回準備畫面',ghost:1,f:showPrep}]);
 }
 
 
