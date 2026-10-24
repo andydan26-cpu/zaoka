@@ -1873,12 +1873,13 @@ function branchDay(){
   G.brWeek=(G.brWeek||0)+sum;
   return {sum,notes:out};
 }
-function openBranches(){
+function openBranches(){try{openBranches0()}catch(e){console.error(e);toast('分店畫面出錯：'+e.message,4)}}
+function openBranches0(){
   G.branches=G.branches||[];
   const cond=branchCond(),ok=cond.every(c=>c[0]);
   let h=`<h1>🏪 分店管理</h1><p class="small">分店交給店長自動經營，每天打烊時結算進帳。店長的管理力越高、店越好，賺越多；愛錢的店長心情差時可能 A 錢。</p>`;
   h+=G.branches.length?`<div class="grid">${G.branches.map(b=>`<div class="box"><div class="row"><b>${b.name}</b><span class="small">★ ${b.stars.toFixed(1)}</span></div>
-     <div class="small">${b.city}${b.area}｜${b.tables} 桌｜${CROWD[b.crowd].n}｜人流 ${'●'.repeat(b.flow)}｜${b.own?'自有店面':'週租 '+fmt(b.rent)}${b.found?'｜<span class="neg">'+DEFECT[b.defect].n+'</span>':''}</div>
+     <div class="small">${b.city}${b.area}｜${b.tables} 桌｜${CROWD[b.crowd].n}｜人流 ${'●'.repeat(b.flow)}｜${b.own?'自有店面':'週租 '+fmt(b.rent)}${b.found&&b.defect&&DEFECT[b.defect]?'｜<span class="neg">'+DEFECT[b.defect].n+'</span>':''}</div>
      ${b.mgr?`<div class="small">店長 ${b.mgr.name}（管理力 ${mgrSkill(b.mgr)}、心情 ${Math.round(b.mgr.mood)}）</div>`:`<div class="box" style="border:2px solid var(--red);margin:4px 0"><b class="neg">⛔ 暫停營業（沒有店長）</b><div class="small">店還在，${b.own?'自有店面不用付租金':'每天照付租金 '+fmt(Math.round(b.rent/7))}。派一位店長就能重新開。</div>
        <div style="display:flex;flex-wrap:wrap;margin-top:4px;gap:6px"><select data-mgrsel="${b.id}" style="flex:1 1 100%;max-width:100%;min-width:0">${mgrCands().map((c,i)=>`<option value="${i}">${c.s.name}（管理力 ${mgrSkill(c.s)}）${c.src==='pool'?'－外聘 '+fmt(salary(c.s)*21+2000):'－從老店調'}</option>`).join('')||'<option value="">沒有人可以派</option>'}</select><button class="btn sm" data-mgrgo="${b.id}">派任</button></div></div>`}
      <div class="small">${b.last?(b.last.closed?`昨天暫停營業｜支出 <b class="neg">${fmt(b.last.net)}</b>`:`昨天營收 ${fmt(b.last.rev)}｜淨利 <b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b>`):'今天開幕'}</div>
