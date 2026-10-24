@@ -1844,10 +1844,13 @@ const BR_EV={
     {t:'留他（加薪 10%）',f:(b,o)=>{b.mgr.raise=(b.mgr.raise||1)*1.1;b.mgr.mood=Math.min(100,b.mgr.mood+20);o.push('🙏 '+b.mgr.name+' 願意留下來')}},
     {t:'放假三天讓他回來看看',f:(b,o)=>{b.mgr.mood=Math.min(100,b.mgr.mood+15);b.war=Math.max(b.war||0,0);b.stars=Math.max(1,b.stars-.1);o.push('🏠 '+b.mgr.name+' 回老店看看，心情變好')}}]},
 };
+const mgrCands=()=>[...G.staff.map(s=>({s,src:'staff'})),...G.pool.map(s=>({s,src:'pool'}))];
 function payCash(v,o){if(G.cash<v){o.push('現金不夠，做不到');return false}G.cash-=v;return true}
 function branchDay(){
   const out=[];let sum=0;G.brInbox=G.brInbox||[];
   for(const b of (G.branches||[])){
+    // 暫停營業的分店還在，只是沒有收入，租金照付
+    if(!b.mgr){const c=b.own?0:Math.round(b.rent/7);b.last={rev:0,net:-c,closed:true};sum-=c;G.cash-=c;continue}
     const m=b.mgr,P=POLICY[b.policy],sk=mgrSkill(m);
     let rev=1.1*sigMul(b)*(1+(b.lv||0)*.1)*(b.visit?1.3:1)*(b.war>0?.9:1)*(G.hq?1.05:1)*b.tables*(b.flow+(b.media>0?1:0))*520*CROWD[b.crowd].v*(.7+sk/100)*(.85+b.stars*.06)*P.r*(1-b.rivals*.06)*rnd(.85,1.15);
     if(b.defect==='pipe')rev*=.9;
@@ -1862,13 +1865,12 @@ function branchDay(){
     ['order','serve','cash','prep','buy'].forEach(k=>m.abil[k]=Math.min(100,m.abil[k]+rnd(.05,.25)));
     b.days=(b.days||0)+1;b.visit=false;if(b.media>0)b.media--;if(b.war>0)b.war--;
     if(m.mood>0&&!G.brInbox.some(x=>x.bid===b.id)&&b.days>2&&Math.random()<.16){const t=pick(Object.keys(BR_EV));G.brInbox.push({id:'E'+Date.now().toString(36)+ri(10,99),bid:b.id,t,exp:G.day+2});out.push(`📨 ${b.name} ${BR_EV[t].n}，要你決定（分店管理）`)}
-    if(m.mood<=0){out.push(`😡 ${b.name} 店長 ${m.name} 受不了離職了，分店暫停營業`);b.mgr=null;}
+    if(m.mood<=0){out.push(`😡 ${b.name} 店長 ${m.name} 受不了離職了，分店暫停營業（到分店管理派新店長就能重新開）`);b.mgr=null;b.closedDay=G.day;}
     net=Math.round(net);b.last={rev:Math.round(rev),net,skim};sum+=net;G.cash+=net;
   }
   // 過期沒回的請示，照預設處理
-  G.brInbox=(G.brInbox||[]).filter(e=>{if(e.exp>G.day)return true;const b=G.branches.find(x=>x.id===e.bid);if(b){const E=BR_EV[e.t];out.push('⌛ '+b.name+' '+E.n+'：你沒回，店長自己決定「'+E.o[E.o.length-1].t+'」');E.o[E.o.length-1].f(b,out)}return false});
+  G.brInbox=(G.brInbox||[]).filter(e=>{if(e.exp>G.day)return true;const b=G.branches.find(x=>x.id===e.bid);if(b&&b.mgr){const E=BR_EV[e.t];out.push('⌛ '+b.name+' '+E.n+'：你沒回，店長自己決定「'+E.o[E.o.length-1].t+'」');E.o[E.o.length-1].f(b,out)}return false});
   G.brWeek=(G.brWeek||0)+sum;
-  G.branches=(G.branches||[]).filter(b=>{if(!b.mgr){G.cash+=b.deposit||0;return false}return true});
   return {sum,notes:out};
 }
 function openBranches(){
@@ -1877,18 +1879,19 @@ function openBranches(){
   let h=`<h1>🏪 分店管理</h1><p class="small">分店交給店長自動經營，每天打烊時結算進帳。店長的管理力越高、店越好，賺越多；愛錢的店長心情差時可能 A 錢。</p>`;
   h+=G.branches.length?`<div class="grid">${G.branches.map(b=>`<div class="box"><div class="row"><b>${b.name}</b><span class="small">★ ${b.stars.toFixed(1)}</span></div>
      <div class="small">${b.city}${b.area}｜${b.tables} 桌｜${CROWD[b.crowd].n}｜人流 ${'●'.repeat(b.flow)}｜${b.own?'自有店面':'週租 '+fmt(b.rent)}${b.found?'｜<span class="neg">'+DEFECT[b.defect].n+'</span>':''}</div>
-     <div class="small">店長 ${b.mgr.name}（管理力 ${mgrSkill(b.mgr)}、心情 ${Math.round(b.mgr.mood)}）</div>
-     <div class="small">${b.last?`昨天營收 ${fmt(b.last.rev)}｜淨利 <b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b>`:'今天開幕'}</div>
+     ${b.mgr?`<div class="small">店長 ${b.mgr.name}（管理力 ${mgrSkill(b.mgr)}、心情 ${Math.round(b.mgr.mood)}）</div>`:`<div class="box" style="border:2px solid var(--red);margin:4px 0"><b class="neg">⛔ 暫停營業（沒有店長）</b><div class="small">店還在，${b.own?'自有店面不用付租金':'每天照付租金 '+fmt(Math.round(b.rent/7))}。派一位店長就能重新開。</div>
+       <div style="display:flex;flex-wrap:wrap;margin-top:4px;gap:6px"><select data-mgrsel="${b.id}" style="flex:1 1 100%;max-width:100%;min-width:0">${mgrCands().map((c,i)=>`<option value="${i}">${c.s.name}（管理力 ${mgrSkill(c.s)}）${c.src==='pool'?'－外聘 '+fmt(salary(c.s)*21+2000):'－從老店調'}</option>`).join('')||'<option value="">沒有人可以派</option>'}</select><button class="btn sm" data-mgrgo="${b.id}">派任</button></div></div>`}
+     <div class="small">${b.last?(b.last.closed?`昨天暫停營業｜支出 <b class="neg">${fmt(b.last.net)}</b>`:`昨天營收 ${fmt(b.last.rev)}｜淨利 <b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b>`):'今天開幕'}</div>
      <div class="row" style="margin-top:4px"><select data-pol="${b.id}">${Object.entries(POLICY).map(([k,p])=>`<option value="${k}"${b.policy===k?' selected':''}>${p.n}</option>`).join('')}</select>
-     <button class="btn sm ghost" data-recall="${b.id}">收掉分店</button></div><div class="small">${POLICY[b.policy].d}</div>
+     ${b.mgr?`<button class="btn sm ghost" data-pause="${b.id}">暫停營業</button>`:''}<button class="btn sm ghost" data-recall="${b.id}">${b.own?'賣掉店面':'退租'}</button></div><div class="small">${POLICY[b.policy].d}</div>
      <div class="row" style="margin-top:6px;justify-content:flex-start;gap:6px"><span class="small">招牌菜</span><select data-sig="${b.id}"><option value="">（沒有）</option>${sigOpts(b).map(id=>`<option value="${id}"${b.sig===id?' selected':''}>${DMAP[id].name}${DMAP[id].local===b.city?'（在地）':''}</option>`).join('')}</select><span class="small pos">${b.sig?'營收 ×'+sigMul(b).toFixed(2):''}</span></div>
      <div class="small">裝修：${BR_LV[b.lv||0].n}${(b.lv||0)<3?'':'（已最高）'}｜開店 ${b.days||0} 天</div>
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
       ${(b.lv||0)<3?`<button class="btn sm" data-blv="${b.id}">裝修成${BR_LV[(b.lv||0)+1].n} ${fmt(BR_LV[(b.lv||0)+1].c)}</button>`:''}
       ${b.tables<20?`<button class="btn sm ghost" data-btb="${b.id}">加 2 桌 ${fmt(60000)}</button>`:''}
       ${b.found&&b.defect?`<button class="btn sm ghost" data-bfix="${b.id}">修好${DEFECT[b.defect].n} ${fmt(50000)}</button>`:''}
-      <button class="btn sm ghost" data-bvis="${b.id}" ${G.visitDay===G.day?'disabled':''}>🚶 巡店 3,000</button></div></div>`).join('')}</div>`:'<div class="box small">還沒有分店。</div>';
-  const inbox=(G.brInbox||[]).filter(e=>G.branches.some(b=>b.id===e.bid));
+      ${b.mgr?`<button class="btn sm ghost" data-bvis="${b.id}" ${G.visitDay===G.day?'disabled':''}>🚶 巡店 3,000</button>`:''}</div></div>`).join('')}</div>`:'<div class="box small">還沒有分店。</div>';
+  const inbox=(G.brInbox||[]).filter(e=>G.branches.some(b=>b.id===e.bid&&b.mgr));
   if(inbox.length)h=h.replace('<h1>🏪 分店管理</h1>','<h1>🏪 分店管理</h1><h2>📨 分店請示</h2>'+inbox.map(e=>{const b=G.branches.find(x=>x.id===e.bid),E=BR_EV[e.t];return `<div class="box" style="border:2px solid var(--gold)"><b>${b.name}：${E.n}</b><div class="small">${typeof E.d==='function'?E.d(b):E.d}（${e.exp-G.day<=1?'明天':'後天'}前沒回，店長會選「${E.o[E.o.length-1].t}」）</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${E.o.map((o,i)=>`<button class="btn sm${i?' ghost':''}" data-ev="${e.id}" data-i="${i}">${o.t}</button>`).join('')}</div></div>`}).join(''));
   if(G.branches.length)h+=`<p class="small">巡店：老闆親自去一間分店看看，隔天那間營收 +30%、店長心情 +12、評價 +0.1，一天只能巡一間。這週分店合計淨利 ${fmt(G.brWeek||0)}。</p>`;
   const hqOk=G.branches.length>=3&&G.branches.every(b=>b.stars>=3.5), hq2Ok=G.hq&&G.branches.length>=8;
@@ -1904,8 +1907,15 @@ function openBranches(){
   $('brBack').onclick=showPrep;$('brMap').onclick=()=>openMap(openBranches);
   P.querySelectorAll('[data-pol]').forEach(el=>el.onchange=()=>{const b=G.branches.find(x=>x.id===el.dataset.pol);b.policy=el.value;toast(b.name+' 方針改成「'+POLICY[el.value].n+'」');openBranches()});
   P.querySelectorAll('[data-recall]').forEach(el=>el.onclick=()=>{const b=G.branches.find(x=>x.id===el.dataset.recall);
-    if(!el.dataset.sure){el.dataset.sure=1;el.textContent='確定收掉？';return}
-    G.cash+=b.own?Math.round(b.price*.8):b.deposit;G.branches=G.branches.filter(x=>x!==b);b.mgr.role='rest';G.staff.push(b.mgr);toast(b.name+' 收掉了，'+b.mgr.name+' 回到老店');openBranches()});
+    if(!el.dataset.sure){el.dataset.sure=1;el.textContent=b.own?'確定賣掉？（店會沒有）':'確定退租？（店會沒有）';return}
+    G.cash+=b.own?Math.round(b.price*.8):b.deposit;G.branches=G.branches.filter(x=>x!==b);if(b.mgr){b.mgr.role='rest';G.staff.push(b.mgr)}toast(b.name+(b.own?' 賣掉了':' 退租了')+(b.mgr?'，'+b.mgr.name+' 回到老店':''));openBranches()});
+  P.querySelectorAll('[data-pause]').forEach(el=>el.onclick=()=>{const b=G.branches.find(x=>x.id===el.dataset.pause);
+    if(!el.dataset.sure){el.dataset.sure=1;el.textContent='確定暫停？';return}
+    b.mgr.role='rest';G.staff.push(b.mgr);toast(b.name+' 暫停營業，'+b.mgr.name+' 先回老店幫忙；店還在，隨時派店長就能重開',3.5);b.mgr=null;b.closedDay=G.day;G.brInbox=(G.brInbox||[]).filter(x=>x.bid!==b.id);openBranches()});
+  P.querySelectorAll('[data-mgrgo]').forEach(el=>el.onclick=()=>{const b=G.branches.find(x=>x.id===el.dataset.mgrgo),sel=P.querySelector(`[data-mgrsel="${b.id}"]`),c=mgrCands()[+sel.value];if(!c)return toast('沒有人可以當店長');
+    const hire=c.src==='pool'?salary(c.s)*21+2000:0;if(hire&&!capOk(hire))return;G.cash-=hire;
+    if(c.src==='staff')G.staff=G.staff.filter(s=>s!==c.s);else G.pool=G.pool.filter(s=>s!==c.s);
+    b.mgr=c.s;b.mgr.mood=Math.max(b.mgr.mood,60);toast('🎉 '+b.name+' 重新開幕！店長是 '+c.s.name,3.5);openBranches()});
   P.querySelectorAll('[data-agent]').forEach(el=>el.onclick=()=>agentView(el.dataset.agent));
   const B=id=>G.branches.find(x=>x.id===id);
   P.querySelectorAll('[data-sig]').forEach(el=>el.onchange=()=>{const b=B(el.dataset.sig);b.sig=el.value||null;toast(b.name+(b.sig?' 主打「'+DMAP[b.sig].name+'」':' 不設招牌菜'));openBranches()});
@@ -1998,8 +2008,8 @@ function rescueCash(notes){
   if(G.cash<0){const need=-G.cash+5000,lim=loanLimit();if(lim>=need){takeLoan(Math.ceil(need/1000)*1000,4,true);notes.push(`🏦 現金不夠，自動借了 4 週短期貸款 ${fmt(Math.ceil(need/1000)*1000)}`)}}
   // 2. 還不夠就變賣分店
   while(G.cash<0&&(G.branches||[]).length){const b=G.branches.sort((x,y)=>(y.own?y.price*.8:y.deposit)-(x.own?x.price*.8:x.deposit))[0];
-    const v=b.own?Math.round(b.price*.8):b.deposit;G.cash+=v;G.branches=G.branches.filter(x=>x!==b);b.mgr.role='rest';b.mgr.mood=Math.max(1,b.mgr.mood-30);G.staff.push(b.mgr);
-    notes.push(`🏪 現金不夠，賣掉了 ${b.name}（拿回 ${fmt(v)}），店長 ${b.mgr.name} 回老店，心情很差`)}
+    const v=b.own?Math.round(b.price*.8):b.deposit;G.cash+=v;G.branches=G.branches.filter(x=>x!==b);if(b.mgr){b.mgr.role='rest';b.mgr.mood=Math.max(1,b.mgr.mood-30);G.staff.push(b.mgr)}
+    notes.push(`🏪 現金不夠，賣掉了 ${b.name}（拿回 ${fmt(v)}）`+(b.mgr?`，店長 ${b.mgr.name} 回老店，心情很差`:''))}
 }
 function loanHtml(){const L=G.loans||[],lim=loanLimit();
   return `<h2>🏦 貸款</h2><p class="small">借款額度看你的店、分店和評價。4 週利息 2%、8 週 5%、12 週 9%，到期在週結算自動扣。週結算現金不夠時會自動借短期貸款，再不夠就要變賣分店，分店賣光還不夠就破產。</p>
