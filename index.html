@@ -42,7 +42,7 @@ body{margin:0;background:var(--wall);color:var(--paper);font-family:var(--f-body
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   padding-block:8px;box-sizing:border-box;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
 #app{position:relative;height:100%;display:flex;flex-direction:column;gap:6px;max-width:1400px;margin:0 auto}
-#hud{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;font-variant-numeric:tabular-nums}
+#hud{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;font-variant-numeric:tabular-nums;padding-left:36px}
 #hud .brand{font-family:var(--f-display);font-size:20px;font-weight:700;color:var(--gold);letter-spacing:.06em}
 .chip{display:inline-flex;align-items:center;gap:4px;background:var(--wall-2);padding:3px 9px;border-radius:999px}
 .chip b{font-weight:700;color:#fff}
@@ -104,7 +104,7 @@ select{font-family:var(--f-body);font-size:13px;padding:3px;border-radius:6px;bo
   body{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);padding-block:0}
   #app{gap:0}
   canvas{border-radius:0;box-shadow:none}
-  #hud{position:absolute;z-index:5;right:6px;bottom:6px;left:118px;flex-wrap:nowrap;overflow-x:auto;font-size:11px;gap:4px 6px;scrollbar-width:none;
+  #hud{position:absolute;z-index:5;right:6px;bottom:6px;left:118px;padding-left:4px;flex-wrap:nowrap;overflow-x:auto;font-size:11px;gap:4px 6px;scrollbar-width:none;
     background:#1d2b27cc;border-radius:12px;padding:4px 6px}
   #hud::-webkit-scrollbar{display:none}
   #hud .brand,#hStock,#rot{display:none!important}
@@ -1266,11 +1266,11 @@ function bubble(c,t){
 }
 const TK_ST={prepQ:'備料',cut:'待下鍋',cutCarry:'搬運',queued:'烹煮',moving:'烹煮',ready:'出餐台',carried:'送餐'};
 function drawOrders(vw=W){
-  const maxC=Math.max(1,Math.min(7,Math.floor((vw-204)/112)));
+  const OX=46,maxC=Math.max(1,Math.min(7,Math.floor((vw-204-OX)/112)));
   ctx.fillStyle='#4a3a2c';ctx.fillRect(0,0,vw,98);
   const list=R.cust.filter(c=>c.st==='order'||c.st==='wait'||c.st==='dwait').sort((a,b)=>(a.seatT||0)-(b.seatT||0));
   if(!list.length)label('目前沒有訂單，客人入座後會出現在這裡',400,54,'#d8c9ad',13,true);
-  list.slice(0,maxC).forEach((c,i)=>{const x=6+i*112,y=6,f=c.pat/c.patMax;
+  list.slice(0,maxC).forEach((c,i)=>{const x=OX+i*112,y=6,f=c.pat/c.patMax;
     ctx.fillStyle='#f3ead8';rr(x,y,106,86,8);ctx.fill();
     ctx.fillStyle=c.dlv?'#2fa86a':'#c2412d';rr(x+4,y+4,38,18,5);ctx.fill();label(c.dlv?'外送':(c.table+1)+' 桌',x+23,y+17,'#fff',11,true);
     label(c.dlv?'🛵 外送單':(c.reg?'⭐'+c.reg:CTYPE[c.type].name)+'・'+c.party+'人',x+74,y+17,c.dlv?'#2fa86a':'#6b5d50',9,true);
@@ -1282,7 +1282,7 @@ function drawOrders(vw=W){
         else{const t=tks[si++];label(DMAP[d].short,cx,y+60,'#2a2420',9,true);if(t)label(TK_ST[t.st]||'',cx,y+71,'#8a5a2a',8,true)}});
       if(c.dishes.length>4)label('+'+(c.dishes.length-4),x+96,y+46,'#6b5d50',10,true);}
     bar(x+6,y+76,94,6,f,f>.5?'#3f8f5a':f>.25?'#d08a24':'#b8352a');});
-  if(list.length>maxC)label('+'+(list.length-maxC)+' 桌',6+maxC*112+14,54,'#f3ead8',12,true);
+  if(list.length>maxC)label('+'+(list.length-maxC)+' 桌',OX+maxC*112+14,54,'#f3ead8',12,true);
 }
 function drawStats(compact,vw=W){
   if(R.battle)return drawBattleBoard(compact,vw);
@@ -1448,7 +1448,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)VO.stop()})
 document.addEventListener('visibilitychange',()=>SND.pause(document.hidden));
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button,.btn');if(b&&b.id!=='bSnd')sfx('click')},true);
 {const b=document.createElement('button');b.id='bSnd';b.title='聲音：全開含語音／音樂音效／只有音效／靜音';
- b.style.cssText='position:fixed;top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right));z-index:9999;width:30px;height:30px;border-radius:50%;border:1px solid #fff4;background:#0006;color:#fff;font-size:14px;opacity:.85;line-height:1;padding:0;cursor:pointer';
+ b.style.cssText='position:fixed;top:max(4px,env(safe-area-inset-top));left:max(4px,env(safe-area-inset-left));z-index:9999;width:30px;height:30px;border-radius:50%;border:1px solid #fff4;background:#0006;color:#fff;font-size:14px;opacity:.85;line-height:1;padding:0;cursor:pointer';
  const lab=()=>b.textContent=['🔇','🔈','🎵','🗣'][SND.mode];lab();
  b.onclick=()=>{SND.setMode((SND.mode+3)%4);lab();if(SND.mode)sfx('click');const names=['已靜音','只有音效','音樂＋音效（不講話）','全開：音樂＋音效＋角色語音'];if(SND.mode<3)VO.stop();if(typeof toast==='function')toast('🔊 '+names[SND.mode],1.4)};
  document.body.appendChild(b)}
