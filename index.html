@@ -489,6 +489,7 @@ function rollPool(){G.pool=[...(G.pool||[]).filter(c=>c.hid),makeCand(),makeCand
 
 /* ---------- 營業 ---------- */
 function startMeal(){
+  SND.music('meal');sfx('open');
   const m=G.meal;
   setTables(tableN());
   R={t:0,dur:180,cust:[],tables:TABLES.map(t=>({...t,c:null,dirty:0,res:null,op:0,bp:0})),bossSpot:null,claims:new Set(),plan:null,waitMsg:null,ps:Object.fromEntries(PREP.map(k=>[k,{job:null,p:0,name:null}])),dog:{x:DOG.x,y:DOG.y,tx:DOG.x,ty:DOG.y,wait:2,face:1,react:null,rt:0},tickets:[],pass:[],sinkDirty:0,payQ:[],
@@ -514,7 +515,7 @@ function startMeal(){
   paused=false; hideOverlay(); renderBar();
   if(G.tutorial) toast('食材架拿食材→備料區處理→切好區拿去爐具',6);
 }
-function spawnGroup(){
+function spawnGroup(){sfx('door',.8);
   const m=G.meal, r=Math.random(), inf=R.ev&&R.ev.infNext; if(inf)R.ev.infNext=false;
   const fp=(m===2?.1:.07)*(promoHigh()?2.5:1)*(1+dl('lux')*.6);
   const fb=((fest()&&fest().fam)?.25:0)+dl('fam')*.07, resv=R.resvLeft>0; if(resv)R.resvLeft--;
@@ -628,7 +629,7 @@ function takeOrder(c){
 }
 function leaveAngry(c,why,payComp=true){
   if(payComp){const v=60*c.party;R.comp+=v;fx(c.x,c.y,'-'+v,'#b8352a')}
-  R.angry++;c.mad=true; addReview(1,CTYPE[c.type].w,why);
+  R.angry++;c.mad=true;sfx('angry',.3); addReview(1,CTYPE[c.type].w,why);
   if(c.inf){addReview(1,8,'網紅：'+why);toast('網紅氣走了，負評擴散中…',3)}
   cancelTickets(c);
   if(c.table!=null){const t=R.tables[c.table];t.dirty+=c.servedN;t.c=null;}
@@ -721,9 +722,9 @@ function update(dt){
     if(!job||!job[2](R.plan)){job=JOBS[st].find(j=>j[2](R.plan));S.job=job?job[0]:null;S.p=0}
     S.name=job?job[4]:null;
     if(!job||!ws.length)continue;
-    S.p+=dt/jobT(st,job)*ws.reduce((a,w)=>a+workerFactor(w.p,'prep',w.boss),0);
+    S.p+=dt/jobT(st,job)*ws.reduce((a,w)=>a+workerFactor(w.p,'prep',w.boss),0);(R.act=R.act||{})[st]=R.t;
     if(S.p>=1){S.p=0;const best=ws.reduce((a,w)=>w.p.abil.prep>a.p.abil.prep?w:a,ws[0]);
-      if(st==='cut'&&Math.random()<errChance(best.p,'prep',best.boss)){fx(ST.cut.x,ST.cut.y-40,'切歪了！','#b8352a');R.fx.push({x:ST.cut.x,y:ST.cut.y-20,img:'smoke',t:1});continue}
+      if(st==='cut'&&Math.random()<errChance(best.p,'prep',best.boss)){sfx('fail');fx(ST.cut.x,ST.cut.y-40,'切歪了！','#b8352a');R.fx.push({x:ST.cut.x,y:ST.cut.y-20,img:'smoke',t:1});continue}
       job[3](R.plan);G.pq=G.pq*.8+best.p.abil.prep*.2;ws.forEach(w=>grow(w.p,'prep',.3));R.plan=prepPlan();}
   }
   // 醃料盆、電鍋計時
@@ -741,10 +742,10 @@ function update(dt){
     if(t.prog>=1){ if(fin)tryFinish(t); continue;}
     const ws=stationWorkers(st); if(!ws.length)continue;
     const sp=ws.reduce((a,w)=>a+workerFactor(w.p,st,w.boss),0)*STOVE_SPD[G.stoveLv[st]];
-    t.prog+=dt/5*sp; R.used.add(st);
+    t.prog+=dt/5*sp; R.used.add(st);(R.act=R.act||{})[st]=R.t;
     if(t.prog>=1){
       const best=ws.reduce((a,w)=>w.p.abil[st]>a.p.abil[st]?w:a,ws[0]);
-      if(Math.random()<errChance(best.p,st,best.boss)){t.prog=0;fx(ST[st].x,ST[st].y-40,'失誤！','#b8352a');R.fx.push({x:ST[st].x,y:ST[st].y-20,img:'smoke',t:1});continue}
+      if(Math.random()<errChance(best.p,st,best.boss)){t.prog=0;sfx('fail');fx(ST[st].x,ST[st].y-40,'失誤！','#b8352a');R.fx.push({x:ST[st].x,y:ST[st].y-20,img:'smoke',t:1});continue}
       t.q.push(clamp(best.p.abil[st]+(G.stoveLv[st]-1)*6,5,100));
       ws.forEach(w=>grow(w.p,st));
       if(fin)tryFinish(t); else {t.st='moving';t.mt=0;t.from=st;t.si++;t.prog=0;}
@@ -756,7 +757,7 @@ function update(dt){
   if(R.sinkDirty>0&&cw.length&&!PWR&&!WTR){R.washP=(R.washP||0)+dt/2.2*cw.reduce((a,w)=>a+workerFactor(w.p,'clean',w.boss),0);
     while(R.washP>=1&&R.sinkDirty>0){R.washP--;R.sinkDirty--;G.plates++;if(cw.some(w=>w.boss)&&!TUT)stAdd('bwash');cw.forEach(w=>grow(w.p,'clean',.25))}}
   if(eq('dish')&&R.sinkDirty>0&&!PWR&&!WTR&&!cw.length){R.dwP=(R.dwP||0)+dt/3;if(R.dwP>=1){R.dwP=0;R.sinkDirty--;G.plates++}} // 洗碗機自己洗
-  dogUpdate(dt);
+  dogUpdate(dt);ambient();
   // 客人
   for(const c of R.cust) custUpdate(c,dt);
   R.cust=R.cust.filter(c=>!(c.st==='gone'));
@@ -785,7 +786,7 @@ function dogUpdate(dt){
     const like=Math.random()<DOG_LIKE[c.type];
     if(c.st==='eat'){if(like){c.dogBonus=(c.dogBonus||0)+.15}else{c.dogBonus=(c.dogBonus||0)-.15}}
     else{const v=c.patMax*(like?.18:-.18);c.pat=clamp(c.pat+v,1,c.patMax)}
-    d.react={t:1.6,like}; if(like)stAdd('dog'); fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
+    d.react={t:1.6,like};if(like)sfx('bark',1.5); if(like)stAdd('dog'); fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
     if(like){d.wait=1.2;d.tx=d.x;d.ty=d.y}
     else{d.wait=0;d.tx=clamp(d.x+rnd(-160,160),40,H>KH?960:570);d.ty=clamp(d.y+rnd(-80,80),d.tx>590?KH+20:240,H-20)}
     break;
@@ -808,12 +809,18 @@ function carrierAI(s,dt){
     if(walk(rt,{x:SPOTS.tray.x+[-30,30,0][s.id%3],y:SPOTS.tray.y+26},135,dt)){t.st='cutCarry';rt.carry=t;rt.fetch=null} return true}
   return false;
 }
+function ambient(){
+  const A=R.act||{},now=R.t;R.amb=R.amb||{};
+  const SN={wok:['sizzle',.45],fry:['sizzle',.6],boil:['bubble',.7],steam:['hiss',1.1],cut:['chop',.32],wash:['bubble',1.4]};
+  for(const k in A){if(now-A[k]>.15)continue;const z=SN[k];if(!z)continue;if((R.amb[k]||0)>now)continue;R.amb[k]=now+z[1]*(0.8+Math.random()*.4);sfx(z[0],.05)}
+  const w=(R.cust||[]).filter(c=>c.st==='wait'||c.st==='order'||c.st==='queue').length;SND.tempo(1+Math.min(.16,w*.025));
+}
 function tryFinish(t){
   if(R.combo&&R.combo.wokServe&&t.steps[t.steps.length-1]==='wok'&&G.plates>0&&t.c&&['wait','order'].includes(t.c.st)&&!TUT){
     G.plates--;t.stall=null;const tb=R.tables[t.c.table];fx(tb.x,tb.y-60,'✨ 出菜即送','#c2412d');deliver(t);return}
   if(G.plates<=0){t.stall='缺盤';return}
   if(R.pass.length>=4){t.stall='出餐台滿';return}
-  t.stall=null;G.plates--;t.st='ready';R.pass.push(t);
+  t.stall=null;G.plates--;t.st='ready';R.pass.push(t);sfx('ding',.25);
 }
 function walk(o,tg,sp,dt){const dx=tg.x-o.x,dy=tg.y-o.y,d=Math.hypot(dx,dy);if(d<4)return true;const s=Math.min(d,sp*dt);o.x+=dx/d*s;o.y+=dy/d*s;return d<6}
 
@@ -824,7 +831,7 @@ function custUpdate(c,dt){
   if(c.st==='queue'){
     const i=R.cust.filter(x=>x.st==='queue').indexOf(c);
     walk(c,{x:50+(i%5)*36,y:botY()-Math.floor(i/5)*30},140,dt);
-    c.pat-=dt/pm/(eq('wait')?1.5:1); if(c.pat<=0){c.st='leave';c.mad=true;R.lost++;if(c.inf){addReview(1,8,'網紅：排隊排到走人');toast('網紅等不及走了，負評開始擴散',3)}fx(c.x,c.y,'不等了','#d08a24');return}
+    c.pat-=dt/pm/(eq('wait')?1.5:1); if(c.pat<=0){c.st='leave';c.mad=true;R.lost++;sfx('angry',.3);if(c.inf){addReview(1,8,'網紅：排隊排到走人');toast('網紅等不及走了，負評開始擴散',3)}fx(c.x,c.y,'不等了','#d08a24');return}
     const ti=R.tables.findIndex(t=>!t.c&&t.dirty===0);
     if(ti>=0&&i===0){c.table=ti;R.tables[ti].c=c;c.st='walkIn'}
   } else if(c.st==='walkIn'){
@@ -861,7 +868,7 @@ function settlePay(c,opt){
   if(opt==='free')s=5; else if(mad)s=1;
   if(c.karenOK)s=Math.max(s,4);
   let tip=0; if(s>=5&&Math.random()<(c.reg?1:.5))tip=Math.round(sum*.1);
-  R.rev+=sum; R.tips+=tip; R.served++; G.today.served++; if(!TUT&&!R.battle){G.story=G.story||{pages:0};G.story.served=(G.story.served||0)+1} G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
+  R.rev+=sum; R.tips+=tip; R.served++;sfx('cash',.15); G.today.served++; if(!TUT&&!R.battle){G.story=G.story||{pages:0};G.story.served=(G.story.served||0)+1} G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   fx(ST.cash.x,ST.cash.y-30,'+'+(sum+tip),'#3f8f5a');
   const txt=s>=5?pick(['好吃到想再來','跟阿嬤做的味道一樣','上菜好快']):s>=4?pick(['不錯吃','價錢合理']):s>=3?pick(['普普','還可以']):pick(['等有點久','有點貴','味道普通']);
   addReview(s,ct.w*(c.type==='foodie'&&dl('lux')?1+dl('lux')*.5:1),opt==='free'?'老闆人超好，下次一定來':mad?'扣我手機，當我是小偷':txt);
@@ -983,6 +990,7 @@ function bossAct(dt,b,sp,B){
 }
 
 function endMeal(){
+  SND.music('prep');SND.tempo(1);sfx('close');
   if(R.battle){battleEnd();return}
   paused=true;
   for(const c of R.cust){
@@ -1058,7 +1066,7 @@ function weekSettle(res){
   if(G.week>32&&G.debt>0)return gameOver('32 週期限到了，負債還沒還清，老店被收回。');
   showBetween(res,true);
 }
-function gameOver(msg){
+function gameOver(msg){SND.music(null);sfx('sad');
   showOverlay(`${illus('ill_over')}<h1>破產</h1><p>${msg}</p><p class="small">撐了 ${G.day-1} 天。正式版會保留老闆能力與解鎖菜系，從頭再來。</p>
   <div class="foot"><button class="btn" id="bNew">重新開始</button></div>`);
   $('bNew').onclick=()=>{newGame();showTitle()};
@@ -1315,6 +1323,111 @@ function renderBar(){
   $('bar').querySelectorAll('.card[data-id]').forEach(el=>el.onclick=()=>{const s=G.staff.find(x=>x.id==el.dataset.id);selected=selected===s?null:s;renderBar()});
 }
 let barT=0;
+/* ---------- 音效與音樂（全部 Web Audio 即時合成） ---------- */
+const SND=(()=>{
+  let ac=null,master,mus,sfxG,noise=null,mode=2,cur=null,step=0,nextT=0,timer=null,tempoK=1,last={};
+  try{const v=localStorage.getItem('zk_snd');if(v!==null)mode=+v}catch(e){}
+  const NOTE={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+  const hz=n=>{const m=/^([A-G])(#?)(\d)$/.exec(n);return 440*Math.pow(2,(NOTE[m[1]]+(m[2]?1:0)+(+m[3]+1)*12-69)/12)};
+  const P=s=>s.trim().split(/\s+/).map(x=>{const[a,b]=x.split(':');return[a,+b]});
+  // 自創曲：台味五聲音階
+  const TR={
+    prep:{bpm:84,wave:'triangle',vol:.16,
+      mel:[P(`E5:2 G5:2 A5:2 G5:2 E5:3 D5:1 C5:4 D5:2 E5:2 G5:2 A5:2 G5:6 r:2 A5:2 C6:2 A5:2 G5:2 E5:2 G5:1 E5:1 D5:4 C5:2 D5:2 E5:2 G5:2 C5:6 r:2`),
+           P(`A4:2 C5:2 D5:2 E5:2 D5:4 G4:4 A4:2 C5:2 D5:3 E5:1 E5:6 r:2 G5:2 A5:2 G5:2 E5:2 D5:2 E5:2 D5:2 C5:2 A4:3 C5:1 D5:2 E5:2 C5:8`)],
+      ch:[['C','A','F','G','C','A','F','C'],['A','G','F','C','F','G','A','C']],bass:'half',perc:0},
+    meal:{bpm:112,wave:'square',vol:.075,
+      mel:[P(`C5:1 E5:1 G5:1 E5:1 A5:2 G5:2 D5:1 G5:1 D5:1 E5:1 D5:2 r:2 E5:1 G5:1 A5:1 C6:1 A5:2 G5:2 A5:1 G5:1 E5:1 D5:1 C5:2 r:2 G5:1 G5:1 A5:1 G5:1 E5:2 C5:2 D5:1 E5:1 G5:1 E5:1 D5:4 C5:1 D5:1 E5:1 G5:1 A5:1 G5:1 E5:1 D5:1 C5:4 r:4`),
+           P(`A5:2 G5:1 E5:1 G5:2 A5:2 C6:2 A5:2 G5:4 E5:1 G5:1 E5:1 D5:1 C5:2 D5:2 E5:1 D5:1 C5:1 D5:1 G4:4 A4:1 C5:1 D5:1 E5:1 G5:2 E5:2 A5:2 G5:2 E5:2 D5:2 D5:1 E5:1 D5:1 C5:1 D5:2 G5:2 C5:2 r:2 C6:2 r:2`)],
+      ch:[['C','G','A','F','C','G','F','C'],['A','F','C','G','A','F','G','C']],bass:'walk',perc:1}
+  };
+  const ROOT={C:'C3',D:'D3',E:'E3',F:'F2',G:'G2',A:'A2'},FIFTH={C:'G3',D:'A3',E:'B3',F:'C3',G:'D3',A:'E3'},THIRD={C:'E4',D:'F#4',E:'G4',F:'A4',G:'B4',A:'C5'};
+  function init(){
+    if(ac)return true;
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+    try{ac=new AC()}catch(e){return false}
+    master=ac.createGain();master.connect(ac.destination);
+    const comp=ac.createDynamicsCompressor();comp.connect(master);
+    mus=ac.createGain();mus.connect(comp);sfxG=ac.createGain();sfxG.connect(comp);
+    const b=ac.createBuffer(1,ac.sampleRate,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;noise=b;
+    apply();return true;
+  }
+  function apply(){if(!ac)return;mus.gain.value=mode===2?.9:0;sfxG.gain.value=mode>=1?.9:0}
+  function tone(f,t,dur,o={}){
+    const os=ac.createOscillator(),g=ac.createGain();os.type=o.w||'sine';os.frequency.setValueAtTime(f,t);
+    if(o.to)os.frequency.exponentialRampToValueAtTime(o.to,t+(o.slide||dur));
+    const v=o.v||.2,a=o.a||.005;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    let n=os;if(o.lp){const f2=ac.createBiquadFilter();f2.type='lowpass';f2.frequency.value=o.lp;os.connect(f2);n=f2}
+    n.connect(g);g.connect(o.out||sfxG);os.start(t);os.stop(t+dur+.05);
+  }
+  function nz(t,dur,o={}){
+    const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noise;s.loop=true;
+    f.type=o.type||'bandpass';f.frequency.value=o.f||2000;f.Q.value=o.q||1;
+    const v=o.v||.2;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(v,t+(o.a||.004));g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(f);f.connect(g);g.connect(o.out||sfxG);s.start(t,Math.random()*.5);s.stop(t+dur+.05);
+  }
+  const FX={
+    click:t=>tone(880,t,.05,{to:620,v:.12}),
+    page:t=>tone(660,t,.07,{v:.08,w:'triangle'}),
+    chop:t=>{nz(t,.05,{f:2600,q:2,v:.22});tone(170,t,.07,{v:.18,to:110})},
+    sizzle:t=>nz(t,.35+Math.random()*.25,{type:'highpass',f:3500,v:.06,a:.03}),
+    bubble:t=>{for(let i=0;i<3;i++){const s=t+i*.07+Math.random()*.04;tone(260+Math.random()*200,s,.06,{to:700,v:.07})}},
+    hiss:t=>nz(t,.5,{f:6500,q:.7,v:.05,a:.08}),
+    pop:t=>tone(520,t,.09,{to:980,v:.12,w:'triangle'}),
+    ding:t=>{tone(1568,t,1.1,{v:.16});tone(1568*2.76,t,.5,{v:.04});tone(2093,t+.12,1,{v:.1})},
+    cash:t=>{tone(1318,t,.06,{w:'square',v:.06,lp:4000});tone(1760,t+.06,.06,{w:'square',v:.06,lp:4000});tone(2637,t+.12,.45,{v:.1});tone(3520,t+.14,.35,{v:.05})},
+    happy:t=>['C6','E6','G6'].forEach((n,i)=>tone(hz(n),t+i*.07,.18,{w:'triangle',v:.1})),
+    angry:t=>{tone(230,t,.35,{w:'sawtooth',to:130,v:.09,lp:1200});tone(180,t+.05,.35,{w:'sawtooth',to:100,v:.06,lp:900})},
+    door:t=>['E6','G6','A6','C7'].sort(()=>Math.random()-.5).slice(0,3).forEach((n,i)=>tone(hz(n),t+i*.09,.6,{v:.045})),
+    bark:t=>[0,.16].forEach(d=>{tone(620,t+d,.1,{w:'sawtooth',to:330,v:.12,lp:1400});nz(t+d,.06,{f:900,q:1.5,v:.08})}),
+    fail:t=>tone(210,t,.28,{w:'square',to:85,v:.08,lp:900}),
+    ach:t=>{['C5','E5','G5','C6'].forEach((n,i)=>{tone(hz(n),t+i*.1,.25,{w:'triangle',v:.14});tone(hz(n),t+i*.1,.2,{w:'square',v:.03,lp:3000})});['C5','E5','G5','C6'].forEach(n=>tone(hz(n),t+.42,1.2,{w:'triangle',v:.07}))},
+    open:t=>{FX.ding(t);['G5','A5','C6'].forEach((n,i)=>tone(hz(n),t+.25+i*.1,.3,{w:'triangle',v:.1}))},
+    close:t=>['C6','A5','G5','E5','C5'].forEach((n,i)=>tone(hz(n),t+i*.12,.35,{w:'triangle',v:.1})),
+    sad:t=>['A4','G4','E4','D4','C4'].forEach((n,i)=>tone(hz(n),t+i*.32,.6,{w:'triangle',v:.12})),
+    coin:t=>tone(1975,t,.25,{v:.07})
+  };
+  function play(n,gap=.06){if(!mode||!init()||ac.state!=='running'&&ac.state!=='suspended')return;const now=ac.currentTime;if(last[n]&&now-last[n]<gap)return;last[n]=now;try{FX[n]&&FX[n](now+.01)}catch(e){}}
+  // 音樂排程
+  function sched(){
+    if(!cur||!ac)return;const T=TR[cur];const spb=60/(T.bpm*tempoK)/2;// 八分音符秒數
+    const total=T.mel.reduce((a,m)=>a+m.reduce((x,y)=>x+y[1],0),0);
+    while(nextT<ac.currentTime+.3){
+      // 找這一步對應的音
+      let s=step%(total*1),sec=0,mi=0;for(;mi<T.mel.length;mi++){const L=T.mel[mi].reduce((x,y)=>x+y[1],0);if(s<L)break;s-=L}
+      const mel=T.mel[mi];let acc=0;for(const[n,d]of mel){if(acc===s&&n!=='r'){tone(hz(n),nextT,d*spb*.95+.05,{w:T.wave,v:T.vol,lp:T.wave==='square'?2400:0,out:mus,a:.01})}acc+=d;if(acc>s)break}
+      const bar=Math.floor(s/8),beat=s%8,c=T.ch[mi][bar];
+      if(T.bass==='half'){if(beat===0)tone(hz(ROOT[c]),nextT,spb*3.8,{v:.16,out:mus,a:.02});if(beat===4)tone(hz(FIFTH[c]),nextT,spb*3.8,{v:.12,out:mus,a:.02});
+        if(beat===0){tone(hz(THIRD[c]),nextT,spb*7.5,{v:.035,out:mus,a:.3});tone(hz(FIFTH[c])*2,nextT,spb*7.5,{v:.03,out:mus,a:.3})}}
+      else{const pat=[ROOT,null,ROOT,FIFTH,ROOT,null,FIFTH,ROOT][beat];if(pat)tone(hz(pat[c]),nextT,spb*.9,{w:'triangle',v:.17,out:mus,lp:900});
+        if(beat===0||beat===4)tone(140,nextT,.12,{to:55,v:.18,out:mus});
+        if(beat%2===1)nz(nextT,.03,{f:1800,q:4,v:.07,out:mus});
+        if(beat===4&&s%32===28)nz(nextT,.08,{type:'highpass',f:5000,v:.05,out:mus})}
+      step++;nextT+=spb;
+    }
+  }
+  function music(n){
+    if(n===cur)return;cur=n;step=0;
+    if(!n){clearInterval(timer);timer=null;return}
+    if(!init())return;nextT=ac.currentTime+.1;
+    if(!timer)timer=setInterval(sched,60);
+  }
+  function tempo(k){tempoK=k}
+  function unlock(){if(!init())return;if(ac.state==='suspended')ac.resume()}
+  function setMode(m){mode=m;try{localStorage.setItem('zk_snd',m)}catch(e){}init();apply()}
+  function pause(on){if(!ac)return;on?ac.suspend():ac.resume()}
+  return{play,music,tempo,unlock,setMode,get mode(){return mode},pause};
+})();
+const sfx=(n,g)=>SND.play(n,g);
+['pointerdown','keydown','touchend'].forEach(e=>addEventListener(e,()=>SND.unlock(),{passive:true}));
+document.addEventListener('visibilitychange',()=>SND.pause(document.hidden));
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button,.btn');if(b&&b.id!=='bSnd')sfx('click')},true);
+{const b=document.createElement('button');b.id='bSnd';b.title='聲音：全開／只有音效／靜音';
+ b.style.cssText='position:fixed;top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right));z-index:9999;width:30px;height:30px;border-radius:50%;border:1px solid #fff4;background:#0006;color:#fff;font-size:14px;opacity:.85;line-height:1;padding:0;cursor:pointer';
+ const lab=()=>b.textContent=['🔇','🔈','🔊'][SND.mode];lab();
+ b.onclick=()=>{SND.setMode((SND.mode+2)%3);lab();if(SND.mode)sfx('click');const names=['已靜音','只有音效（音樂關）','音樂＋音效全開'];if(typeof toast==='function')toast('🔊 '+names[SND.mode],1.4)};
+ document.body.appendChild(b)}
+
 function toast(t,sec=2.2){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.opacity=0,sec*1000)}
 
 /* ---------- 輸入 ---------- */
@@ -1408,7 +1521,7 @@ function helpHtml(){return `<h2>怎麼玩</h2><div class="grid">
  <div class="box"><b>店寵小黃</b><br>阿嬤的狗會在店裡亂逛。碰到客人時，喜歡狗的客人耐心會回升，怕狗的客人耐心會下降；正在吃飯的客人會影響最後給的評價。家庭客最愛狗。</div>
  <div class="box"><b>耐心</b><br>點餐和等菜會扣耐心，耗光就賠錢、給一星。時間到還沒上菜也要賠。</div>
  <div class="box"><b>目標</b><br>每週付利息與稅，32 週內還清阿嬤的 150 萬。現金變負就破產。</div></div>`}
-function showTitle(){
+function showTitle(){SND.music('prep');
   paused=true;
   let has=false;try{has=!!localStorage.getItem('zaoka')}catch(e){}
   showOverlay(`${illus('ill_open')}<h1>灶跤人生</h1>
@@ -1485,7 +1598,7 @@ function menuFilterHtml(){const f=G.menuFilter||'all',ks=DISHES.filter(d=>known(
   return `<div class="row" style="justify-content:flex-start;gap:8px;margin:4px 0 8px"><span class="small">顯示</span><select id="menuFilter">${o('all','全部')}${o('on','只看今天有賣的')}
    <optgroup label="烹調方式">${o('st:boil','煮')}${o('st:wok','炒')}${o('st:steam','蒸')}${o('st:fry','炸')}</optgroup>
    <optgroup label="菜系">${o('c:tw','台式')}${o('c:local','在地菜')}${cu.map(k=>o('c:'+k,CUISINES[k].n)).join('')}</optgroup></select></div>`}
-function showPrep(){
+function showPrep(){SND.music('prep');
   paused=true;selected=null;
   const day=G.meal===0;
   G.menu=G.menu.filter(id=>dishOk(DMAP[id])&&known(id));if(!G.menu.length)G.menu=['egg'];
@@ -2094,7 +2207,7 @@ const ACH=[
 function checkAch(m){
   if(TUT||(R&&R.battle))return [];G.ach=G.ach||{};const got=[];
   for(const a of ACH){if(G.ach[a.id])continue;let ok=false;try{ok=a.ok(m)}catch(e){}
-    if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a)}}
+    if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a);sfx('ach',1)}}
   got.forEach((a,i)=>setTimeout(()=>toast('🏆 成就達成：'+a.n+(a.rw>1?'（+'+fmt(a.rw)+'）':''),3.5),i*1800));
   return got;
 }
@@ -2260,7 +2373,7 @@ function dlvSpawn(){
 function dlvHandoff(c){
   const r=c.pat/c.patMax, sc=r>.5?5:r>.2?4:3;
   let sum=Math.round(c.dishes.reduce((s,id)=>s+G.prices[id]*(1+masteryBonus(((G.mastery||{})[id])||0)),0)*(1-DLV_FEE));
-  R.rev+=sum;G.today.dlv=(G.today.dlv||0)+1;G.today.rev+=sum;c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
+  sfx('cash',.15);R.rev+=sum;G.today.dlv=(G.today.dlv||0)+1;G.today.rev+=sum;c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   G.dlvRev=(G.dlvRev||[]).concat([sc]).slice(-30);R.dlvDone=(R.dlvDone||0)+1;
   fx(SPOTS.dlv.x,SPOTS.dlv.y-40,'🛵 +'+sum+'（'+'★'.repeat(sc)+'）','#2fa86a');c.st='leave';
 }
@@ -2427,7 +2540,7 @@ function openRivals(){
     if(a==='buynem'){if(!pay(800000))return;G.rivals=G.rivals.filter(x=>x!==r);G.nemDone=true;save();return showEnding()}
     save();openRivals()});
 }
-function showEnding(){
+function showEnding(){SND.music('prep');sfx('ach');
   showOverlay(`${illus('ill_end')}<h1>👑 併購金鼎集團</h1><p style="font-size:17px">林天賜在合約上簽下名字時，手一直在抖。</p>
    <p>「當年我偷了師父的配方，以為只要夠快、夠便宜就能贏。」他看著你端上來的滷肉飯，沉默了很久。「……這個味道，我一直做不出來。」</p>
    <p>阿福師站在廚房門口，偷偷擦了一下眼角。秀玉姨說：「阿嬤要是看到，一定很高興。」</p>
