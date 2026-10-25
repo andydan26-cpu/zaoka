@@ -489,7 +489,7 @@ function rollPool(){G.pool=[...(G.pool||[]).filter(c=>c.hid),makeCand(),makeCand
 
 /* ---------- 營業 ---------- */
 function startMeal(){
-  SND.music('meal');sfx('open');
+  SND.music('meal');sfx('open');say('開店囉！',{force:1,...VP.boss});
   const m=G.meal;
   setTables(tableN());
   R={t:0,dur:180,cust:[],tables:TABLES.map(t=>({...t,c:null,dirty:0,res:null,op:0,bp:0})),bossSpot:null,claims:new Set(),plan:null,waitMsg:null,ps:Object.fromEntries(PREP.map(k=>[k,{job:null,p:0,name:null}])),dog:{x:DOG.x,y:DOG.y,tx:DOG.x,ty:DOG.y,wait:2,face:1,react:null,rt:0},tickets:[],pass:[],sinkDirty:0,payQ:[],
@@ -515,7 +515,7 @@ function startMeal(){
   paused=false; hideOverlay(); renderBar();
   if(G.tutorial) toast('食材架拿食材→備料區處理→切好區拿去爐具',6);
 }
-function spawnGroup(){sfx('door',.8);
+function spawnGroup(){sfx('door',.8);say(pk1(['歡迎光臨！','歡迎光臨，裡面請～','來喔，歡迎歡迎！','歡迎光臨，幾位？']),{ch:.7,...VP.xy});
   const m=G.meal, r=Math.random(), inf=R.ev&&R.ev.infNext; if(inf)R.ev.infNext=false;
   const fp=(m===2?.1:.07)*(promoHigh()?2.5:1)*(1+dl('lux')*.6);
   const fb=((fest()&&fest().fam)?.25:0)+dl('fam')*.07, resv=R.resvLeft>0; if(resv)R.resvLeft--;
@@ -629,7 +629,7 @@ function takeOrder(c){
 }
 function leaveAngry(c,why,payComp=true){
   if(payComp){const v=60*c.party;R.comp+=v;fx(c.x,c.y,'-'+v,'#b8352a')}
-  R.angry++;c.mad=true;sfx('angry',.3); addReview(1,CTYPE[c.type].w,why);
+  R.angry++;c.mad=true;sfx('angry',.3);say(pk1(['等太久了啦！','什麼店啊，不吃了！','算了算了，走了！','服務這麼差！']),{gap:800,...cvo(c)}); addReview(1,CTYPE[c.type].w,why);
   if(c.inf){addReview(1,8,'網紅：'+why);toast('網紅氣走了，負評擴散中…',3)}
   cancelTickets(c);
   if(c.table!=null){const t=R.tables[c.table];t.dirty+=c.servedN;t.c=null;}
@@ -745,7 +745,7 @@ function update(dt){
     t.prog+=dt/5*sp; R.used.add(st);(R.act=R.act||{})[st]=R.t;
     if(t.prog>=1){
       const best=ws.reduce((a,w)=>w.p.abil[st]>a.p.abil[st]?w:a,ws[0]);
-      if(Math.random()<errChance(best.p,st,best.boss)){t.prog=0;sfx('fail');fx(ST[st].x,ST[st].y-40,'失誤！','#b8352a');R.fx.push({x:ST[st].x,y:ST[st].y-20,img:'smoke',t:1});continue}
+      if(Math.random()<errChance(best.p,st,best.boss)){t.prog=0;sfx('fail');say(pk1(['哎呀！','糟糕，重來！']),{ch:.4,...VP.fu});fx(ST[st].x,ST[st].y-40,'失誤！','#b8352a');R.fx.push({x:ST[st].x,y:ST[st].y-20,img:'smoke',t:1});continue}
       t.q.push(clamp(best.p.abil[st]+(G.stoveLv[st]-1)*6,5,100));
       ws.forEach(w=>grow(w.p,st));
       if(fin)tryFinish(t); else {t.st='moving';t.mt=0;t.from=st;t.si++;t.prog=0;}
@@ -786,7 +786,7 @@ function dogUpdate(dt){
     const like=Math.random()<DOG_LIKE[c.type];
     if(c.st==='eat'){if(like){c.dogBonus=(c.dogBonus||0)+.15}else{c.dogBonus=(c.dogBonus||0)-.15}}
     else{const v=c.patMax*(like?.18:-.18);c.pat=clamp(c.pat+v,1,c.patMax)}
-    d.react={t:1.6,like};if(like)sfx('bark',1.5); if(like)stAdd('dog'); fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
+    d.react={t:1.6,like};if(like){sfx('bark',1.5);say(pk1(['好可愛喔！','狗狗好乖～','你叫小黃喔？']),{ch:.6,...cvo(c)})} if(like)stAdd('dog'); fx(d.x,d.y-24,like?'好可愛 ♥':'怕狗…','#'+(like?'3f8f5a':'b8352a'));
     if(like){d.wait=1.2;d.tx=d.x;d.ty=d.y}
     else{d.wait=0;d.tx=clamp(d.x+rnd(-160,160),40,H>KH?960:570);d.ty=clamp(d.y+rnd(-80,80),d.tx>590?KH+20:240,H-20)}
     break;
@@ -820,7 +820,7 @@ function tryFinish(t){
     G.plates--;t.stall=null;const tb=R.tables[t.c.table];fx(tb.x,tb.y-60,'✨ 出菜即送','#c2412d');deliver(t);return}
   if(G.plates<=0){t.stall='缺盤';return}
   if(R.pass.length>=4){t.stall='出餐台滿';return}
-  t.stall=null;G.plates--;t.st='ready';R.pass.push(t);sfx('ding',.25);
+  t.stall=null;G.plates--;t.st='ready';R.pass.push(t);sfx('ding',.25);say(pk1(['出菜囉！','這桌的好了！','菜來了，快送！']),{ch:.45,...VP.fu});
 }
 function walk(o,tg,sp,dt){const dx=tg.x-o.x,dy=tg.y-o.y,d=Math.hypot(dx,dy);if(d<4)return true;const s=Math.min(d,sp*dt);o.x+=dx/d*s;o.y+=dy/d*s;return d<6}
 
@@ -831,11 +831,11 @@ function custUpdate(c,dt){
   if(c.st==='queue'){
     const i=R.cust.filter(x=>x.st==='queue').indexOf(c);
     walk(c,{x:50+(i%5)*36,y:botY()-Math.floor(i/5)*30},140,dt);
-    c.pat-=dt/pm/(eq('wait')?1.5:1); if(c.pat<=0){c.st='leave';c.mad=true;R.lost++;sfx('angry',.3);if(c.inf){addReview(1,8,'網紅：排隊排到走人');toast('網紅等不及走了，負評開始擴散',3)}fx(c.x,c.y,'不等了','#d08a24');return}
+    c.pat-=dt/pm/(eq('wait')?1.5:1); if(c.pat<=0){c.st='leave';c.mad=true;R.lost++;sfx('angry',.3);say(pk1(['等太久了啦！','排這麼久，不等了！','算了，換一家！']),{gap:800,...cvo(c)});if(c.inf){addReview(1,8,'網紅：排隊排到走人');toast('網紅等不及走了，負評開始擴散',3)}fx(c.x,c.y,'不等了','#d08a24');return}
     const ti=R.tables.findIndex(t=>!t.c&&t.dirty===0);
     if(ti>=0&&i===0){c.table=ti;R.tables[ti].c=c;c.st='walkIn'}
   } else if(c.st==='walkIn'){
-    if(walk(c,R.tables[c.table],150,dt)){c.st='order';c.seatT=R.t;c.patMax=c.pat=CTYPE[c.type].pat*.7*pm;}
+    if(walk(c,R.tables[c.table],150,dt)){c.st='order';c.seatT=R.t;say(pk1(['老闆，點菜！','我要點餐～','有什麼推薦的？','先來一碗滷肉飯！','這個看起來好好吃']),{ch:.35,...cvo(c)});c.patMax=c.pat=CTYPE[c.type].pat*.7*pm;}
   } else if(c.st==='order'||c.st==='wait'){
     c.pat-=dt; if(c.pat<=0)leaveAngry(c,c.st==='order'?'沒人來點餐':'等太久了');
   } else if(c.st==='eat'){
@@ -868,7 +868,7 @@ function settlePay(c,opt){
   if(opt==='free')s=5; else if(mad)s=1;
   if(c.karenOK)s=Math.max(s,4);
   let tip=0; if(s>=5&&Math.random()<(c.reg?1:.5))tip=Math.round(sum*.1);
-  R.rev+=sum; R.tips+=tip; R.served++;sfx('cash',.15); G.today.served++; if(!TUT&&!R.battle){G.story=G.story||{pages:0};G.story.served=(G.story.served||0)+1} G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
+  R.rev+=sum; R.tips+=tip; R.served++;sfx('cash',.15);if(s>=4.3&&Math.random()<.5)say(pk1(['真好吃！下次再來！','讚啦，跟以前一樣好吃','老闆，好吃喔！']),cvo(c));else say(pk1(['謝謝光臨！','謝謝，慢走喔！','歡迎再來～']),{ch:.6,...VP.xy}); G.today.served++; if(!TUT&&!R.battle){G.story=G.story||{pages:0};G.story.served=(G.story.served||0)+1} G.today.rev+=sum+tip; c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
   fx(ST.cash.x,ST.cash.y-30,'+'+(sum+tip),'#3f8f5a');
   const txt=s>=5?pick(['好吃到想再來','跟阿嬤做的味道一樣','上菜好快']):s>=4?pick(['不錯吃','價錢合理']):s>=3?pick(['普普','還可以']):pick(['等有點久','有點貴','味道普通']);
   addReview(s,ct.w*(c.type==='foodie'&&dl('lux')?1+dl('lux')*.5:1),opt==='free'?'老闆人超好，下次一定來':mad?'扣我手機，當我是小偷':txt);
@@ -990,7 +990,7 @@ function bossAct(dt,b,sp,B){
 }
 
 function endMeal(){
-  SND.music('prep');SND.tempo(1);sfx('close');
+  SND.music('prep');SND.tempo(1);sfx('close');say(pk1(['今天辛苦了！','收工囉，大家辛苦了！']),{force:1,...VP.xy});
   if(R.battle){battleEnd();return}
   paused=true;
   for(const c of R.cust){
@@ -1325,8 +1325,8 @@ function renderBar(){
 let barT=0;
 /* ---------- 音效與音樂（全部 Web Audio 即時合成） ---------- */
 const SND=(()=>{
-  let ac=null,master,mus,sfxG,noise=null,mode=2,cur=null,step=0,nextT=0,timer=null,tempoK=1,last={};
-  try{const v=localStorage.getItem('zk_snd');if(v!==null)mode=+v}catch(e){}
+  let ac=null,master,mus,sfxG,noise=null,mode=3,cur=null,step=0,nextT=0,timer=null,tempoK=1,last={};
+  try{const v=localStorage.getItem('zk_snd2');if(v!==null)mode=+v}catch(e){}
   const NOTE={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
   const hz=n=>{const m=/^([A-G])(#?)(\d)$/.exec(n);return 440*Math.pow(2,(NOTE[m[1]]+(m[2]?1:0)+(+m[3]+1)*12-69)/12)};
   const P=s=>s.trim().split(/\s+/).map(x=>{const[a,b]=x.split(':');return[a,+b]});
@@ -1352,7 +1352,7 @@ const SND=(()=>{
     const b=ac.createBuffer(1,ac.sampleRate,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;noise=b;
     apply();return true;
   }
-  function apply(){if(!ac)return;mus.gain.value=mode===2?.9:0;sfxG.gain.value=mode>=1?.9:0}
+  function apply(){if(!ac)return;mus.gain.value=mode>=2?.9:0;sfxG.gain.value=mode>=1?.9:0}
   function tone(f,t,dur,o={}){
     const os=ac.createOscillator(),g=ac.createGain();os.type=o.w||'sine';os.frequency.setValueAtTime(f,t);
     if(o.to)os.frequency.exponentialRampToValueAtTime(o.to,t+(o.slide||dur));
@@ -1414,18 +1414,43 @@ const SND=(()=>{
   }
   function tempo(k){tempoK=k}
   function unlock(){if(!init())return;if(ac.state==='suspended')ac.resume()}
-  function setMode(m){mode=m;try{localStorage.setItem('zk_snd',m)}catch(e){}init();apply()}
+  function setMode(m){mode=m;try{localStorage.setItem('zk_snd2',m)}catch(e){}init();apply()}
   function pause(on){if(!ac)return;on?ac.suspend():ac.resume()}
   return{play,music,tempo,unlock,setMode,get mode(){return mode},pause};
 })();
 const sfx=(n,g)=>SND.play(n,g);
+/* ---------- 中文語音（手機內建語音合成） ---------- */
+const VO=(()=>{
+  const ok='speechSynthesis' in window;let vz=null,lastAt=0,primed=false;
+  const pick=()=>{const v=speechSynthesis.getVoices();vz=v.find(x=>/zh[-_]TW/i.test(x.lang))||v.find(x=>/zh[-_](HK|Hant)/i.test(x.lang))||v.find(x=>/^(zh|cmn)/i.test(x.lang))||null};
+  if(ok){pick();speechSynthesis.onvoiceschanged=pick}
+  const clean=t=>String(t).replace(/<[^>]*>/g,'').replace(/[\u{1F000}-\u{1FFFF}☀-➿️★☆♥●○◆]/gu,'').replace(/……/g,'，').trim();
+  function say(t,o={}){
+    if(!ok||SND.mode<3||document.hidden)return;const now=performance.now();
+    if(o.force)speechSynthesis.cancel();
+    else{if(speechSynthesis.speaking||speechSynthesis.pending)return;if(now-lastAt<(o.gap||2600))return;if(o.ch!=null&&Math.random()>o.ch)return}
+    const txt=clean(t);if(!txt)return;lastAt=now;
+    const u=new SpeechSynthesisUtterance(txt);u.lang=vz?vz.lang:'zh-TW';if(vz)u.voice=vz;u.pitch=Math.max(.1,Math.min(2,o.p||1));u.rate=o.r||1.05;u.volume=o.v??1;
+    try{speechSynthesis.speak(u)}catch(e){}
+  }
+  function prime(){if(!ok||primed)return;primed=true;try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}}
+  function stop(){if(ok)speechSynthesis.cancel()}
+  return{say,prime,stop};
+})();
+const VP={boss:{p:1,r:1.05},fu:{p:.6,r:.9},xy:{p:1.25,r:1},old:{p:.7,r:.85},trav:{p:.9,r:.95},wen:{p:1.5,r:1.1},jie:{p:1.1,r:1.12},lin:{p:.8,r:.95}};
+const pk1=a=>a[Math.floor(Math.random()*a.length)];
+function cvo(c){const b={office:[1,1.15],family:[1.15,1.05],foodie:[.85,.95]}[c&&c.type]||[1,1.05];if(c&&!c.vp)c.vp=.8+Math.random()*.45;return{p:b[0]*((c&&c.vp)||1),r:b[1]}}
+const say=(t,o)=>VO.say(t,o);
+['pointerdown','touchend'].forEach(e=>addEventListener(e,()=>VO.prime(),{passive:true,once:true}));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)VO.stop()});
+
 ['pointerdown','keydown','touchend'].forEach(e=>addEventListener(e,()=>SND.unlock(),{passive:true}));
 document.addEventListener('visibilitychange',()=>SND.pause(document.hidden));
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button,.btn');if(b&&b.id!=='bSnd')sfx('click')},true);
-{const b=document.createElement('button');b.id='bSnd';b.title='聲音：全開／只有音效／靜音';
+{const b=document.createElement('button');b.id='bSnd';b.title='聲音：全開含語音／音樂音效／只有音效／靜音';
  b.style.cssText='position:fixed;top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right));z-index:9999;width:30px;height:30px;border-radius:50%;border:1px solid #fff4;background:#0006;color:#fff;font-size:14px;opacity:.85;line-height:1;padding:0;cursor:pointer';
- const lab=()=>b.textContent=['🔇','🔈','🔊'][SND.mode];lab();
- b.onclick=()=>{SND.setMode((SND.mode+2)%3);lab();if(SND.mode)sfx('click');const names=['已靜音','只有音效（音樂關）','音樂＋音效全開'];if(typeof toast==='function')toast('🔊 '+names[SND.mode],1.4)};
+ const lab=()=>b.textContent=['🔇','🔈','🎵','🗣'][SND.mode];lab();
+ b.onclick=()=>{SND.setMode((SND.mode+3)%4);lab();if(SND.mode)sfx('click');const names=['已靜音','只有音效','音樂＋音效（不講話）','全開：音樂＋音效＋角色語音'];if(SND.mode<3)VO.stop();if(typeof toast==='function')toast('🔊 '+names[SND.mode],1.4)};
  document.body.appendChild(b)}
 
 function toast(t,sec=2.2){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.opacity=0,sec*1000)}
@@ -2207,7 +2232,7 @@ const ACH=[
 function checkAch(m){
   if(TUT||(R&&R.battle))return [];G.ach=G.ach||{};const got=[];
   for(const a of ACH){if(G.ach[a.id])continue;let ok=false;try{ok=a.ok(m)}catch(e){}
-    if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a);sfx('ach',1)}}
+    if(ok){G.ach[a.id]=G.day;G.cash+=a.rw;got.push(a);sfx('ach',1);say('成就達成：'+a.n,{gap:500})}}
   got.forEach((a,i)=>setTimeout(()=>toast('🏆 成就達成：'+a.n+(a.rw>1?'（+'+fmt(a.rw)+'）':''),3.5),i*1800));
   return got;
 }
@@ -2427,9 +2452,9 @@ function portraitKey(who,txt,md){const k=P_KEY[who];if(!k)return null;
   return 'p_'+k+'_'+m}
 const illus=k=>ART_SRC[k]?`<img alt="" src="${ART_SRC[k]}" style="width:100%;border-radius:10px;display:block;margin-bottom:8px">`:'';
 function scene(title,lines,done,img){let i=0;
-  const show=()=>{const [who,txt,md]=lines[i],pk=portraitKey(who,txt,md);showOverlay(`${img?illus(img):''}<h1>${title}</h1><div class="box" style="display:flex;gap:12px;align-items:center;font-size:16px;line-height:1.7"><img alt="" src="${ART_SRC[pk]||ART_SRC[PORT[who]]}" style="${ART_SRC[pk]?'width:120px':'width:64px'};flex:0 0 auto"><span><b style="color:var(--red)">${PNAME[who]}</b><br>${txt}</span></div>
+  const show=()=>{const [who,txt,md]=lines[i],pk=portraitKey(who,txt,md);setTimeout(()=>say(txt,{force:1,...(VP[who]||{})}),120);showOverlay(`${img?illus(img):''}<h1>${title}</h1><div class="box" style="display:flex;gap:12px;align-items:center;font-size:16px;line-height:1.7"><img alt="" src="${ART_SRC[pk]||ART_SRC[PORT[who]]}" style="${ART_SRC[pk]?'width:120px':'width:64px'};flex:0 0 auto"><span><b style="color:var(--red)">${PNAME[who]}</b><br>${txt}</span></div>
     <div class="foot"><span class="small">${i+1}／${lines.length}</span><button class="btn" id="scNext">${i<lines.length-1?'下一句':'好'}</button></div>`);
-    $('scNext').onclick=()=>{if(i>=lines.length)return;i++;if(i<lines.length)show();else done()}};show()}
+    $('scNext').onclick=()=>{if(i>=lines.length)return;i++;if(i<lines.length)show();else{VO.stop();done()}}};show()}
 function recipePage(){G.story.pages++;G.dishQ=G.dishQ||{};G.dishQ.lurou=(G.dishQ.lurou||0)+5;
   if(G.story.pages>=4&&!known('secret')){G.known=[...(G.known||BASE_DISH),'secret'];G.prices.secret=G.prices.secret||DMAP.secret.ref;G.dishQ.secret=15}}
 const STORY=[
