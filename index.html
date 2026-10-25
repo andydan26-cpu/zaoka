@@ -1084,6 +1084,11 @@ function setRot(on){ROT=on;document.body.classList.toggle('rot90',on);try{$('bFu
 // 螢幕座標 → 元素內座標（支援旋轉模式）
 function elXY(el,e){const r=el.getBoundingClientRect();return ROT?{x:e.clientY-r.top,y:r.right-e.clientX}:{x:e.clientX-r.left,y:e.clientY-r.top}}
 const STRIP=98;
+function placeSnd(z){const b=$('bSnd');if(!b)return;let L=4,T=4;
+  if(R&&$('overlay').style.display==='none'){const r=cv.getBoundingClientRect(),k=r.width/VIEW.cw;
+    L=r.left+(z.ox+90*z.s)*k-15;T=r.top+(z.oy+158*z.s)*k;
+    L=clamp(L,r.left+4,r.right-34);T=clamp(T,r.top+(z.top||0)*k+4,r.bottom-34)}
+  L=Math.round(L)+'px';T=Math.round(T)+'px';if(b.style.left!==L){b.style.left=L}if(b.style.top!==T){b.style.top=T}}
 function camera(){
   const {cw,ch}=VIEW, s0=Math.min(cw/W,ch/H), follow=CAM.follow??(s0<0.8);
   if(!follow||!R)return {s:s0,ox:(cw-W*s0)/2,oy:(ch-H*s0)/2,hud:false,top:0};
@@ -1221,13 +1226,14 @@ function draw(){
   if(!charSpr('boss',b,64,[...STOVES,...PREP,'prep'].includes(R.bossSpot)&&!b.carry)&&!spr('chef',b.x,b.y+20,62,false,true)){person(b.x,b.y,'#f5d3b3','#c2412d',15,true);ctx.fillStyle='#d9a441';ctx.fillRect(b.x-9,b.y-22,18,5)}
   label(isGuest()?(COOP.name||'我'):'老闆',b.x,b.y+29,'#c2412d',12,true);
   if(b.carry&&b.carry.basket){ctx.font='16px serif';ctx.fillText('🧺',b.x+16,b.y-2);label(b.carry.basket+'×'+b.carry.n+' →放到備料區',b.x,b.y-50,'#c2412d',11,true)}
-  else if(b.carry){const cut=b.carry.st==='cutCarry';ctx.font='16px serif';ctx.fillText(cut?'🥬':b.carry.dish?DISH_IC[b.carry.dish]:'🍽',b.x+16,b.y-2);if(cut)label(DMAP[b.carry.dish].short+'→放到'+ROLES[b.carry.steps[0]],b.x,b.y-50,'#c2412d',11,true);else if(b.carry.dish)label('→'+(b.carry.c.table+1)+'桌',b.x,b.y-50,'#c2412d',11,true)}
+  else if(b.carry){const cut=b.carry.st==='cutCarry';ctx.font='16px serif';ctx.fillText(cut?'🥬':b.carry.dish?DISH_IC[b.carry.dish]:'🍽',b.x+16,b.y-2);if(cut)label(DMAP[b.carry.dish].short+'→放到'+ROLES[b.carry.steps[0]],b.x,b.y-50,'#c2412d',11,true);else if(b.carry.dish)label(b.carry.c.dlv?'→外帶':'→'+(b.carry.c.table+1)+'桌',b.x,b.y-50,'#c2412d',11,true)}
   if(b.act){ctx.strokeStyle='#c2412d';ctx.lineWidth=4;ctx.beginPath();ctx.arc(b.act.x,b.act.y,11,-Math.PI/2,-Math.PI/2+Math.PI*2*b.actT);ctx.stroke()}
   // 桌號
   R.tables.forEach((t,i)=>{const x=t.x,y=t.y+40;ctx.fillStyle='#0003';ctx.beginPath();ctx.arc(x+1,y+2,15,0,7);ctx.fill();
     ctx.fillStyle='#c2412d';ctx.beginPath();ctx.arc(x,y,15,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();
     label((i+1)+'',x,y+6,'#fff',17,true)});
   for(const f of R.fx){ctx.globalAlpha=Math.min(1,f.t);if(f.img)spr(f.img,f.x,f.y,f.img==='perfect'?44:40);else label(f.txt,f.x,f.y,f.col,15,true);ctx.globalAlpha=1}
+  placeSnd(z);
   if(z.hud){ctx.setTransform(d*z.hs,0,0,d*z.hs,0,0);const vw=VIEW.cw/z.hs;drawOrders(vw);drawStats(true,vw)}
   if(selected){ctx.setTransform(d,0,0,d,0,0);ctx.fillStyle='#fffdf6e6';rr(VIEW.cw/2-150,VIEW.ch-30,300,24,12);ctx.fill();label('已選 '+selected.name+'：點崗位圈圈調派',VIEW.cw/2,VIEW.ch-13,'#c2412d',13,true)}
 }
@@ -1266,13 +1272,13 @@ function bubble(c,t){
 }
 const TK_ST={prepQ:'備料',cut:'待下鍋',cutCarry:'搬運',queued:'烹煮',moving:'烹煮',ready:'出餐台',carried:'送餐'};
 function drawOrders(vw=W){
-  const OX=46,maxC=Math.max(1,Math.min(7,Math.floor((vw-204-OX)/112)));
+  const OX=6,maxC=Math.max(1,Math.min(7,Math.floor((vw-204-OX)/112)));
   ctx.fillStyle='#4a3a2c';ctx.fillRect(0,0,vw,98);
   const list=R.cust.filter(c=>c.st==='order'||c.st==='wait'||c.st==='dwait').sort((a,b)=>(a.seatT||0)-(b.seatT||0));
   if(!list.length)label('目前沒有訂單，客人入座後會出現在這裡',400,54,'#d8c9ad',13,true);
   list.slice(0,maxC).forEach((c,i)=>{const x=OX+i*112,y=6,f=c.pat/c.patMax;
     ctx.fillStyle='#f3ead8';rr(x,y,106,86,8);ctx.fill();
-    ctx.fillStyle=c.dlv?'#2fa86a':'#c2412d';rr(x+4,y+4,38,18,5);ctx.fill();label(c.dlv?'外送':(c.table+1)+' 桌',x+23,y+17,'#fff',11,true);
+    ctx.fillStyle=c.dlv?'#2fa86a':'#c2412d';rr(x+4,y+4,38,18,5);ctx.fill();label(c.dlv?'外帶':(c.table+1)+' 桌',x+23,y+17,'#fff',11,true);
     label(c.dlv?'🛵 外送單':(c.reg?'⭐'+c.reg:CTYPE[c.type].name)+'・'+c.party+'人',x+74,y+17,c.dlv?'#2fa86a':'#6b5d50',9,true);
     if(c.st==='order'){ctx.font='22px serif';ctx.textAlign='center';ctx.fillText('📝',x+53,y+52);label('等點餐',x+53,y+70,'#6b5d50',10,true)}
     else{const tks=R.tickets.filter(t=>t.c===c);let si=0;
@@ -1532,7 +1538,7 @@ $('bOrder').onclick=()=>{
 function toggleClose(){paused2=false;paused=false;hideOverlay();$('bPause').textContent='暫停'}
 
 /* ---------- 面板 ---------- */
-function showOverlay(h,view=''){const P=$('panel'),keep=view&&P.dataset.view===view&&$('overlay').style.display!=='none',st=keep?P.scrollTop:0;
+function showOverlay(h,view=''){{const sb=$('bSnd');if(sb){sb.style.left='4px';sb.style.top='4px'}}const P=$('panel'),keep=view&&P.dataset.view===view&&$('overlay').style.display!=='none',st=keep?P.scrollTop:0;
   P.innerHTML=h;P.dataset.view=view;$('overlay').style.display='flex';P.scrollTop=st}
 function hideOverlay(){$('overlay').style.display='none'}
 function helpHtml(){return `<h2>怎麼玩</h2><div class="grid">
@@ -1761,9 +1767,9 @@ function moveBoss2(dt){
   b.x=clamp(b.x,15,W-15);b.y=clamp(b.y,162,H-15);
 }
 const bossOnSpot=k=>R.bossSpot===k?R.boss:(R.boss2&&R.boss2Spot===k?R.boss2:null);
-function carryCode(c){if(!c)return 0;if(c.basket)return ['b',c.basket,c.n];if(c.dirty)return ['d',c.dirty];if(c.st==='cutCarry')return ['c',c.dish];if(c.dish)return ['t',c.dish,c.c?c.c.table:0];return 0}
+function carryCode(c){if(!c)return 0;if(c.basket)return ['b',c.basket,c.n];if(c.dirty)return ['d',c.dirty];if(c.st==='cutCarry')return ['c',c.dish];if(c.dish)return ['t',c.dish,c.c?(c.c.dlv?-1:c.c.table):0];return 0}
 function carryDec(a,cm){if(!a)return null;if(a[0]==='b')return {basket:a[1],n:a[2]};if(a[0]==='d')return {dirty:a[1]};
-  if(a[0]==='c')return {st:'cutCarry',dish:a[1],steps:DMAP[a[1]].steps};return {st:'carried',dish:a[1],c:{table:a[2]}}}
+  if(a[0]==='c')return {st:'cutCarry',dish:a[1],steps:DMAP[a[1]].steps};return {st:'carried',dish:a[1],c:{table:a[2],dlv:a[2]<0}}}
 const r0=v=>Math.round(v), r2=v=>Math.round(v*100)/100;
 function encBoss(b){return b?[r0(b.x),r0(b.y),carryCode(b.carry),b.act?r0(b.act.x):0,b.act?r0(b.act.y):0,r2(b.actT||0),b.tx!=null?r0(b.tx):null,b.ty!=null?r0(b.ty):null,b.nm||'老闆']:0}
 function encodeSnap(){
