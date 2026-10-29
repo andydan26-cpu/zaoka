@@ -840,13 +840,25 @@ function custUpdate(c,dt){
     c.pat-=dt; if(c.pat<=0)leaveAngry(c,c.st==='order'?'沒人來點餐':'等太久了');
   } else if(c.st==='eat'){
     c.eatT-=dt; if(c.eatT<=0){const t=R.tables[c.table];
-      if(c.buffet){R.sinkDirty+=c.dishes.length;c.st='order';c.dishes=[];c.servedN=0;c.qs=[];fx(t.x,t.y-50,'再來一輪！','#c2412d');return} // 包場客人吃完繼續加點（盤子直接收走）
+      if(c.buffet){buffetPay(c);R.sinkDirty+=c.dishes.length;c.st='order';c.dishes=[];c.servedN=0;c.qs=[];fx(t.x,t.y-50,'再來一輪！','#c2412d');return} // 包場客人吃完繼續加點（盤子直接收走）
       t.dirty+=c.dishes.length;t.c=null;c.st='toPay';R.payQ.push(c)}
   } else if(c.st==='toPay'||c.st==='pay'){
     const i=R.payQ.indexOf(c); if(walk(c,{x:ST.cash.x-i*32,y:ST.cash.y+72},150,dt))c.st='pay';
   } else if(c.st==='leave'){
     if(walk(c,DOOR,170,dt))c.st='gone';
   }
+}
+function buffetPay(c){
+  const sum=Math.round(c.dishes.reduce((a,id)=>a+G.prices[id]*(1+masteryBonus(((G.mastery||{})[id])||0)),0));
+  R.rev+=sum;G.today.rev+=sum;c.dishes.forEach(d=>G.today.dish[d]=(G.today.dish[d]||0)+1);
+  c.rounds=(c.rounds||0)+1;c.allQ=(c.allQ||[]).concat(c.qs||[]);
+  sfx('cash',.15);const t=R.tables[c.table];fx(t.x,t.y-74,'餐費 +'+sum,'#3f8f5a');
+}
+function buffetEnd(c){
+  if(c.st==='eat'&&c.dishes.length)buffetPay(c);
+  const Q=c.allQ||[],q=Q.length?Q.reduce((a,b)=>a+b,0)/Q.length:50,r=c.rounds||0;
+  const s=clamp(Math.round(3+(q-55)/22+(r>=3?.6:r<=1?-1:0)),1,5);
+  addReview(s,1,s>=4?'包場辦得很成功，菜一直來':s>=3?'包場還可以':'包場等菜等好久');
 }
 function settlePay(c,opt){
   if(!opt&&R.ev&&R.ev.wallet&&R.t<R.dur&&!R.battle){R.ev.wallet=false;
@@ -995,7 +1007,7 @@ function endMeal(){
   paused=true;
   for(const c of R.cust){
     if(c.st==='dwait'){if(c.pat/c.patMax<.4)dlvLate(c);else{cancelTickets(c);c.st='leave'}continue} // 打烊時還在等、但還沒等太久的外送單，不扣評分
-    if(c.buffet){G.plates+=c.servedN;continue}
+    if(c.buffet){G.plates+=c.servedN;buffetEnd(c);continue}
     if(c.st==='order'||c.st==='wait'){R.comp+=60*c.party;R.angry++;G.plates+=c.servedN;addReview(2,CTYPE[c.type].w,'打烊了還沒上菜')}
     else if(c.st==='eat'){G.plates+=c.dishes.length;c.patLeft=c.patLeft??.5;settlePay(c)}
     else if(c.st==='toPay'||c.st==='pay'){c.patLeft=c.patLeft??.5;c.qs=c.qs||[60];settlePay(c)}
@@ -1027,7 +1039,7 @@ function endMeal(){
   if(eq('rest'))G.staff.forEach(s=>s.stam=Math.min(100,s.stam+8));
   if(G.staff.some(s=>s.hid==='xiaowen'))G.staff.forEach(s=>s.mood=Math.min(100,s.mood+5));
   G.staff.forEach(s=>{delete s.offShift;if(s.backRole){if(s.role==='rest')s.role=s.backRole;delete s.backRole}if(s.onLeave)delete s.onLeave});
-  const res={dlv:R.dlvDone||0,dlvLate:R.dlvLate||0,rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
+  const res={book:R.book,dlv:R.dlvDone||0,dlvLate:R.dlvLate||0,rev:R.rev+R.tips,comp:R.comp,util,sal,served:R.served,angry:R.angry,lost:R.lost,reviews:R.newReviews.slice(-6),notes};
   G.cash+=res.rev-res.comp-util-sal; G.weekRev+=res.rev;
   // 辭職
   const quit=G.staff.filter(s=>s.mood<=0);G.staff=G.staff.filter(s=>s.mood>0);quit.forEach(s=>{notes.push(s.name+' 心情跌到谷底，離職了');friendsLeave(s,notes)});
@@ -1599,7 +1611,7 @@ function showBetween(res,dayOver){
   <div class="stats" style="margin-top:8px">
    <div>營收<b class="pos">${fmt(res.rev)}</b></div><div>賠錢<b class="neg">${fmt(res.comp)}</b></div>
    <div>薪水<b>${fmt(res.sal)}</b></div><div>水電瓦斯<b>${fmt(res.util)}</b></div>
-   <div>本場淨額<b class="${net>=0?'pos':'neg'}">${fmt(net)}</b></div><div>現金<b>${fmt(G.cash)}</b></div>
+   <div>本場淨額<b class="${net>=0?'pos':'neg'}">${fmt(net)}</b></div><div>現金<b>${fmt(G.cash)}</b></div>${res.book&&res.book.amt?`<div>${res.book.n}（${res.book.name}）<b class="pos">${fmt(res.book.amt)}</b><span class="small">接單時已收進現金</span></div>`:''}
    <div>服務組數<b>${res.served}</b></div>${G.dlvOn||res.dlv||res.dlvLate?`<div>🛵 外送完成<b>${res.dlv} 單</b></div><div>外送遲到<b class="${res.dlvLate?'neg':''}">${res.dlvLate} 單</b></div><div>平台評分<b>${dlvRating().toFixed(1)}</b></div>`:''}<div>生氣離開<b>${res.angry}</b></div><div>等不及走掉<b>${res.lost}</b></div><div>星等<b>${stars().toFixed(1)}</b></div></div>`;
   if(res.week)h+=`<h2>第 ${G.week-1} 週結算</h2><div class="stats"><div>本週營收<b>${fmt(res.week.rev)}</b></div><div>稅金 5%<b class="neg">${fmt(res.week.tax)}</b></div><div>負債利息 0.2%<b class="neg">${fmt(res.week.intr)}</b></div><div>剩餘負債<b>${fmt(G.debt)}</b></div><div>期限<b>第 32 週</b></div></div>`;
   if(res.branch!=null&&(G.branches||[]).length)h+=`<h2>🏪 分店今日結算</h2><div class="grid">${G.branches.map(b=>`<div class="box"><b>${b.name}</b>　★${b.stars.toFixed(1)}<br><span class="small">營收 ${fmt(b.last.rev)}｜淨利 </span><b class="${b.last.net>=0?'pos':'neg'}">${fmt(b.last.net)}</b></div>`).join('')}</div><p>分店合計 <b class="${res.branch>=0?'pos':'neg'}">${fmt(res.branch)}</b>（已加進現金）</p>`;
@@ -2417,7 +2429,8 @@ function dlvHtml(){
 
 /* ---------- 訂位、包場 ---------- */
 function bookingSetup(){
-  const b=G.booking;G.booking=null;R.party=false;R.resvLeft=0;if(!b||TUT||R.battle)return;
+  const b=G.booking;G.booking=null;R.party=false;R.resvLeft=0;R.book=null;if(!b||TUT||R.battle)return;
+  R.book={n:b.type==='party'?'包場費':'訂金',name:b.name,amt:b.paid||b.fee||0};
   if(b.type==='resv'&&!G.menu.some(id=>known(id)&&priceR(DMAP[id])<=1.5)){for(let i=0;i<b.groups;i++)addReview(1,1,'看到菜單價錢，訂位直接取消');setTimeout(()=>toast('📒 '+b.name+' 看到菜價氣到取消訂位，還留了一星負評',4),4900);return}
   if(b.type==='resv'){R.resvLeft=b.groups;for(let i=0;i<b.groups;i++)R.spawns.push(.5+i*2);R.spawns.sort((a,c)=>a-c);toast('📒 今天有訂位：'+b.name+' '+b.groups+' 桌',3)}
   if(b.type==='party'){R.party=b;R.spawns=[];for(let i=0;i<4;i++)spawnGroup();R.cust.forEach(c=>{c.buffet=true;c.party=4;c.heads=c.heads.concat(Array(4).fill(0).map(()=>pick(HEADS))).slice(0,4);c.spr=c.heads.map(()=>ri(0,4));c.pat=c.patMax=999});R.closed=true;toast('🎊 今天是'+b.name+'的包場！客人會一直加點',3.5)}
@@ -2862,10 +2875,10 @@ const BETWEEN_EV=[
     {t:'花 2,000 發聲明澄清',f(){G.cash-=2000;next()}},{t:'清者自清，不理',f(){G.reviews.push(1,1,1,1);next()}}])}},
  {ok:()=>!G.booking,run(next){const n=pick(['王先生','林太太','陳小姐','張老闆']),g=ri(2,3),dep=g*500;
    evBox('📒 訂位電話',`${n}打電話來，想訂下一場 ${g} 桌，先付訂金 ${fmt(dep)}。開店後他們會先到，等得比一般客人久。`,[
-    {t:'接受訂位',f(){G.cash+=dep;G.booking={type:'resv',name:n,groups:g};next()}},{t:'客滿婉拒',f:next}])}},
+    {t:'接受訂位',f(){G.cash+=dep;sfx('cash');toast('📒 訂金 '+fmt(dep)+' 已收進現金',2.5);G.booking={type:'resv',name:n,groups:g,paid:dep};next()}},{t:'客滿婉拒',f:next}])}},
  {ok:()=>!G.booking&&stars()>=3.2&&G.week>=2,run(next){const n=pick(['巷口里長的壽宴','附近公司的尾牙','同學會','社區媽媽的聚餐']),fee=Math.round((6000+stars()*1500)/500)*500;
    evBox('🎊 包場申請',`${n}想包下一場，包場費 ${fmt(fee)} 先收。那一場不接其他客人，4 桌都是他們的人，吃完會一直加點，要讓他們吃得開心。`,[
-    {t:'接下包場',f(){G.cash+=fee;G.booking={type:'party',name:n,fee};next()}},{t:'婉拒',f:next}])}},
+    {t:'接下包場',f(){G.cash+=fee;sfx('cash');toast('🎊 包場費 '+fmt(fee)+' 已收進現金',2.5);G.booking={type:'party',name:n,fee,paid:fee};next()}},{t:'婉拒',f:next}])}},
  {ok:()=>G.day>3,run(next){const good=Math.random()<.6;G.mods={cust:{v:good?1.3:.75,left:3}};
    evBox('🏬 附近開了新商場',good?'商場帶來大量人潮，接下來三場客人變多。':'商場美食街把客人分流走了，接下來三場客人變少。',[{t:'知道了',f:next}])}},
 ];
