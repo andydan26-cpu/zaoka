@@ -1571,7 +1571,7 @@ function showTitle(){SND.music('prep');
   <p>阿嬤走了，留下巷口這間開了四十年的小吃店、兩位老員工、一隻叫小黃的狗，還有 150 萬的債。</p>
   <p>你辭掉工作回來接手。阿福師說：「阿嬤的滷肉飯，不能在你手上倒。」</p>
   <p>第一次開店，秀玉姨和阿福師會先帶你走一遍。</p>
-  <p class="small">可玩原型：只有阿嬤老店、台式 6 道菜與核心營業循環。數值為暫定。</p>
+  <p class="small">可玩原型：只有阿嬤老店、台式 6 道菜與核心營業循環。數值為暫定。<br>版本 v83（10/29）</p>
   <div class="foot">${has?'<button class="btn ghost" id="bLoad">繼續上次進度</button>':''}<button class="btn ghost" id="bFull2">⛶ 全螢幕</button><button class="btn ghost" id="bCode">💾 存檔碼</button><button class="btn ghost" id="bCoop">🤝 合作模式</button><button class="btn ghost" id="bBattle">⚔ 對戰模式</button><button class="btn" id="bStart">開店</button></div>`);
   $('bFull2').onclick=()=>{$('bFull').onclick();setTimeout(()=>{const b=$('bFull2');if(b)b.textContent=$('bFull').textContent},500)};
   $('bStart').onclick=()=>{newGame();startTutorial()};
