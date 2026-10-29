@@ -1641,7 +1641,8 @@ function menuFilterHtml(){const f=G.menuFilter||'all',ks=DISHES.filter(d=>known(
   return `<div class="row" style="justify-content:flex-start;gap:8px;margin:4px 0 8px"><span class="small">顯示</span><select id="menuFilter">${o('all','全部')}${o('on','只看今天有賣的')}
    <optgroup label="烹調方式">${o('st:boil','煮')}${o('st:wok','炒')}${o('st:steam','蒸')}${o('st:fry','炸')}</optgroup>
    <optgroup label="菜系">${o('c:tw','台式')}${o('c:local','在地菜')}${cu.map(k=>o('c:'+k,CUISINES[k].n)).join('')}</optgroup></select></div>`}
-function showPrep(){SND.music('prep');
+function fixStaffIds(){if(!G||!G.staff)return;const all=[...G.staff,...(G.pool||[])],seen=new Set();let mx=0;all.forEach(s=>{if(typeof s.id==='number')mx=Math.max(mx,s.id)});G.nid=Math.max(G.nid||0,mx+1);all.forEach(s=>{if(s.id==null||seen.has(s.id))s.id=G.nid++;seen.add(s.id)})}
+function showPrep(){fixStaffIds();SND.music('prep');
   paused=true;selected=null;
   const day=G.meal===0;
   G.menu=G.menu.filter(id=>dishOk(DMAP[id])&&known(id));if(!G.menu.length)G.menu=['egg'];
@@ -1657,7 +1658,7 @@ function showPrep(){SND.music('prep');
     <div class="row" style="margin-top:4px"><span class="small">下一場</span>${sel(s)}</div>
     ${s.master?(()=>{const m=G.staff.find(x=>x.id===s.master.id);return m?`<div class="small" style="margin-top:4px">🎓 跟 ${m.name} 學${AB[s.master.key]}（${Math.round(s.abil[s.master.key])}／50）<a href="#" data-unm="${s.id}">解除</a></div>`:''})()
       :(()=>{const o=mentorOpts(s);return o.length?`<div class="small" style="margin-top:4px">🎓 <select data-mentor="${s.id}"><option value="">拜師學藝…</option>${o.map(x=>`<option value="${x.m.id}|${x.k}">${x.m.name}（${AB[x.k]} ${Math.round(x.v)}）</option>`).join('')}</select></div>`:''})()}
-    ${FIRE_ASK===s.id?`<div class="row" style="margin-top:6px;background:#c2412d18;border-radius:6px;padding:4px 6px"><span class="small neg">資遣費 ${fmt(severance(s))}，其他人心情會變差</span><span><button class="btn sm" data-fireok="${s.id}">確定開除</button> <button class="btn sm ghost" data-firecancel="1">算了</button></span></div>`
+    ${FIRE_ASK===s.id?`<div class="row" style="margin-top:6px;background:#c2412d18;border-radius:6px;padding:4px 6px"><span class="small neg">只開除 ${s.name}，資遣費 ${fmt(severance(s))}，其他人心情會變差</span><span><button class="btn sm" data-fireok="${s.id}">確定開除</button> <button class="btn sm ghost" data-firecancel="1">算了</button></span></div>`
       :`<div style="text-align:right;margin-top:4px"><button class="btn sm ghost" data-fire="${s.id}" style="color:var(--bad)">開除</button></div>`}</div>`};
   const bossBox=()=>`<div class="box"><div class="row"><b>老闆（你）</b><span class="small">自己走位</span></div><div class="small">親自做哪個崗位，哪項能力就成長</div><div class="small">${Object.entries(G.boss.abil).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>AB[k]+' '+Math.round(v)).join('・')}</div></div>`;
   const comboHtml=()=>{const cs=findCombos(),fr=[];G.staff.forEach((a,i)=>G.staff.slice(i+1).forEach(b=>{if(relOf(a,b)>=60)fr.push(a.name+'＋'+b.name)}));
@@ -1751,7 +1752,7 @@ function showPrep(){SND.music('prep');
   P.querySelectorAll('[data-fireok]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.fireok);FIRE_ASK=null;if(!s)return showPrep();
     const c=severance(s);if(G.cash<c){toast('現金不夠付資遣費 '+fmt(c));return showPrep()}
     G.cash-=c;G.staff=G.staff.filter(x=>x!==s);
-    G.staff.forEach(o=>{o.mood=Math.max(1,o.mood-(o.traits.includes('玻璃心')?12:o.traits.includes('樂天')?3:6))});friendsLeave(s);
+    G.staff.forEach(o=>{o.mood=Math.max(1,o.mood-(o.traits.includes('玻璃心')?12:o.traits.includes('樂天')?3:6))});G.staff.forEach(o=>{if(relOf(s,o)>=60)o.mood=Math.max(1,o.mood-10)});
     toast(s.name+' 離開了，付了資遣費 '+fmt(c),3);save();showPrep()});
   P.querySelectorAll('[data-bonus]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.bonus);if(G.cash<3000)return toast('現金不夠');G.cash-=3000;s.mood+=s.traits.includes('愛錢')?50:25;showPrep()});
   P.querySelectorAll('[data-talk]').forEach(b=>b.onclick=()=>{const s=G.staff.find(x=>x.id==b.dataset.talk);if(Math.random()<.5){s.mood+=25;toast(s.name+'：好啦，我再做做看')}else{s.mood=Math.max(1,s.mood-5);toast(s.name+'：你根本不懂')}showPrep()});
